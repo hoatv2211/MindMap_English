@@ -159,3 +159,17 @@ export const DocumentHighlightSchema = z.object({
   path: ["endOffset"],
 });
 export type DocumentHighlight = z.infer<typeof DocumentHighlightSchema>;
+
+export const VocabularyInboxStatusSchema = z.enum(["queued","processing","ready","failed","approved","dismissed"]);
+export const VocabularyInboxSourceSchema = z.enum(["quick_capture","agent_chat","mindmap"]);
+export const VocabularyExampleRoleSchema = z.enum(["basic","daily_life","personalized","learner"]);
+export const VocabularyExampleDraftSchema = z.object({role:VocabularyExampleRoleSchema,sentence:z.string().min(1).max(300),translationVi:z.string().min(1).max(400),usageNote:z.string().max(200).default("")});
+export const VocabularyPlacementDraftSchema = z.object({mindmapId:z.number().int().positive().nullable().default(null),parentNodeId:z.number().int().positive().nullable().default(null),reason:z.string().max(240).default(""),newMindmap:z.object({title:z.string().min(1).max(120),description:z.string().max(500).default(""),branchLabel:z.string().min(1).max(100)}).nullable().default(null)});
+export const VocabularyEnrichmentDraftSchema = z.object({normalizedTerm:z.string().min(1).max(160),displayTerm:z.string().min(1).max(160),meaningVi:z.string().min(1).max(500),ipa:z.string().max(120).default(""),partOfSpeech:z.string().max(80).default(""),cefr:CefrLevelSchema,itemType:z.enum(["word","phrase","sentence"]),examples:z.array(VocabularyExampleDraftSchema).length(3),placement:VocabularyPlacementDraftSchema});
+export const VocabularyCaptureInputSchema = z.object({rawText:z.string().trim().min(1).max(500),contextText:z.string().trim().max(1000).default(""),sourceType:VocabularyInboxSourceSchema.default("quick_capture"),sourceReference:z.string().max(200).default(""),hintMindmapId:z.number().int().positive().nullable().optional(),hintParentNodeId:z.number().int().positive().nullable().optional()});
+export type VocabularyInboxStatus=z.infer<typeof VocabularyInboxStatusSchema>;
+export type VocabularyInboxSource=z.infer<typeof VocabularyInboxSourceSchema>;
+export type VocabularyExampleDraft=z.infer<typeof VocabularyExampleDraftSchema>;
+export type VocabularyPlacementDraft=z.infer<typeof VocabularyPlacementDraftSchema>;
+export type VocabularyEnrichmentDraft=z.infer<typeof VocabularyEnrichmentDraftSchema>;
+export type VocabularyCaptureInput=z.infer<typeof VocabularyCaptureInputSchema>;
