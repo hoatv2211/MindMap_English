@@ -84,7 +84,16 @@ Provider hết tài khoản/quota. Chờ `retry-after` hoặc thêm provider/fal
 - Kiểm tra firewall local.
 - Mở **Cài đặt → Kiểm tra kết nối**.
 
-## 8. Quyền riêng tư
+## 8. Shadowing và extraction draft
+
+- **TTS online:** đọc câu mục tiêu trong Phòng luyện. Khi provider lỗi, người dùng vẫn đọc câu trên màn hình và nhập transcript thủ công.
+- **STT online:** nhận audio WebM từ thao tác ghi âm chủ động. Khi provider lỗi, session, notebook và deterministic transcript diff vẫn hoạt động.
+- **Document extraction:** gửi nội dung các section được chọn tới chat model. Output phải qua Zod và chỉ trở thành draft `recommended|optional|skip`.
+- Dictionary lookup, document import/read/highlight, notebook, session và content diff không phụ thuộc 9Router.
+
+Không gửi toàn bộ thư viện mặc định. Chỉ gửi audio hoặc section khi người dùng chủ động yêu cầu.
+
+## 9. Quyền riêng tư
 
 - API key chỉ ở backend.
 - Audio chỉ gửi khi người dùng bấm ghi âm.

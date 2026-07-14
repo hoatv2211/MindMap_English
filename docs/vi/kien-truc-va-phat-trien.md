@@ -158,7 +158,31 @@ npm audit --audit-level=moderate
 - Error gửi ra client không chứa secret hoặc stack trace.
 - UI state local trước; chỉ thêm state library khi có nhu cầu thật.
 
-## 11. Mở rộng
+## 11. Dictionary, Speaking và Documents
+
+Module mới:
+
+- `server/modules/dictionary`: `WordIndex`, exact lookup, completion, typo suggestion; không phụ thuộc 9Router.
+- `server/modules/speaking`: sentence notebook, session repository, attempt metrics và LCS transcript diff.
+- `server/modules/documents`: TXT/Markdown/EPUB parser, checksum storage, section/highlight repository và extraction drafts.
+
+Route chính:
+
+- `GET /api/dictionary/lookup`, `GET /api/dictionary/complete`.
+- `/api/speaking/notebook`, `/api/speaking/sessions`, `/attempts`, `/complete`.
+- `/api/documents`, `/highlights`, `/vocabulary`, `/extraction-drafts`.
+
+Bảng mới: `sentence_notebook`, `speaking_sessions`, `speaking_session_items`, `speaking_attempts`, `document_sources`, `document_sections`, `document_highlights`.
+
+File tài liệu dùng đường dẫn suy ra từ checksum dưới `data/documents/<checksum>/`, không dùng filename người dùng làm storage path. Highlight giữ exact offset, fingerprint và liên kết tùy chọn tới canonical vocabulary hoặc sentence notebook. EPUB được kiểm tra traversal và tổng kích thước giải nén.
+
+`AgentToolService` chỉ trả extraction draft đã validate Zod. Draft không có quyền ghi trực tiếp vào vocabulary, review card, mindmap hoặc SRS.
+
+## 12. Backup và dữ liệu mới
+
+SQLite mới vẫn nằm trong snapshot backup. Thư mục `data/documents` là dữ liệu local cần giữ cùng backup media khi mở rộng backup package. `data/dictionary/words.txt` là nguồn tùy chọn, có thể phục hồi riêng.
+
+## 13. Mở rộng
 
 Điểm mở rộng an toàn:
 

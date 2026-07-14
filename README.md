@@ -118,6 +118,31 @@ data/
 - PWA offline cache có versioning.
 - Đồng bộ nhiều thiết bị tùy chọn.
 
+## Mở rộng học từ 3 nguồn
+
+- **Từ điển offline:** gợi ý tối đa 6 từ, tra exact, sửa lỗi gõ và kiểm tra từ đã có trong thư viện. Có thể nạp danh sách lớn từ `data/dictionary/words.txt`; nếu thiếu file, app dùng vocabulary local và seed tích hợp.
+- **Phòng luyện shadowing:** lưu câu vào sổ, nghe TTS, ghi âm qua STT hoặc nhập transcript thủ công, so sánh từ thiếu/thừa/thay thế và hoàn tất buổi luyện. Điểm hiển thị là độ khớp nội dung, không phải điểm phát âm.
+- **Bàn đọc cá nhân:** nhập TXT, Markdown hoặc EPUB tối đa 5 MB, đọc theo section/chapter, chỉnh cỡ chữ/giãn dòng, chọn đoạn để tạo thẻ từ, lưu sổ câu, prefill mindmap draft hoặc hỏi gia sư với provenance chính xác.
+- **AI extraction draft:** phân tích section đã chọn thành nhóm `recommended`, `optional`, `skip`. Kết quả luôn là bản nháp; không tự ghi vào vocabulary, mindmap hoặc SRS.
+
+Thư mục dữ liệu mới:
+
+```text
+data/
+├── dictionary/words.txt   # tùy chọn
+├── documents/<checksum>/  # tài liệu nhập local
+├── mindmap-english.db
+├── media/
+└── backups/
+```
+
+## Kiểm thử hiện tại
+
+- 22 file test, 64 unit/integration/component tests pass.
+- 5 Playwright scenarios pass trên desktop/mobile; 1 desktop case skip có chủ đích vì mobile-only.
+- TypeScript strict và production build pass.
+- `npm audit --audit-level=moderate`: 0 vulnerabilities.
+
 ## License
 
 Xem [LICENSE](LICENSE).

@@ -128,7 +128,37 @@ data/
 
 Không commit thư mục `data`, file `.env`, API key hoặc audio cá nhân lên Git.
 
-## 11. Sự cố thường gặp
+## 11. Từ điển offline và nhập từ
+
+- Khi nhập term trong bản nháp mindmap, app gợi ý tối đa 6 từ và hỗ trợ bàn phím Arrow, Enter, Escape.
+- Từ đã có trong vocabulary được báo ngay để tránh tạo bản sao.
+- Từ chưa biết không bị chặn; người dùng phải xác nhận rõ trước khi giữ từ đó.
+- Có thể đặt word list tại `data/dictionary/words.txt`, mỗi dòng một từ. Không có file này, app vẫn chạy bằng vocabulary local và seed tích hợp.
+
+## 12. Sổ câu và Phòng luyện
+
+1. Trong Bàn đọc, chọn câu rồi bấm **Lưu vào sổ câu**.
+2. Mở **Phòng luyện** từ thanh điều hướng chính.
+3. Bấm **Bắt đầu luyện**, nghe mẫu hoặc giữ nút microphone để nói.
+4. Nếu không dùng microphone/STT, nhập transcript vào ô thử nghiệm.
+5. Xem từ thiếu, thừa, thay thế và phần trăm khớp nội dung.
+6. Chọn **Nói lại**, **Câu tiếp**, hoặc **Hoàn tất buổi luyện** ở câu cuối.
+
+App không chấm chất lượng phát âm. STT/TTS cần 9Router; transcript thủ công và diff nội dung vẫn dùng được khi speech provider offline.
+
+## 13. Bàn đọc cá nhân
+
+1. Mở **Thư viện → Tài liệu đang đọc**.
+2. Nhập file TXT, Markdown hoặc EPUB, tối đa 5 MB.
+3. Mở tài liệu, đọc theo section/chapter và dùng mục lục để di chuyển.
+4. Dùng nút `+/-` để chỉnh cỡ chữ và giãn dòng. Thiết lập được lưu trên trình duyệt.
+5. Chọn đoạn văn rồi dùng **Tạo thẻ từ**, **Lưu vào sổ câu**, **Thêm vào mindmap** hoặc **Hỏi gia sư**. App giữ document ID, section ID và offset nguồn.
+6. **Thêm vào mindmap** chỉ prefill form tạo bản nháp; vẫn cần lưu và duyệt thủ công.
+7. Bấm **Phân tích chương** để tạo bản nháp AI khi 9Router online.
+
+AI phân loại đề xuất thành **Nên học**, **Có thể biết**, **Bỏ qua**. Đây chỉ là bản nháp xem trước, chưa ghi vào nội dung chính.
+
+## 14. Sự cố thường gặp
 
 ### Trang báo AI offline
 
