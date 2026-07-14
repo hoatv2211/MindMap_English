@@ -1,4 +1,4 @@
-﻿# MindMap English Local AI — Design Specification
+# MindMap English Local AI — Design Specification
 
 ## 1. Product Summary
 

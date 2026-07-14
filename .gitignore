@@ -1,4 +1,4 @@
-﻿/.tools/
+/.tools/
 /.superpowers/
 /.worktrees/
 /node_modules/
@@ -13,3 +13,6 @@ MindMapVocabulary_SP.pdf
 MindMapVocabulary_SP.docx
 /sqlite-src-3530300/
 /sqlite-dll-win-x64-3530300/
+/test-results/
+/playwright-report/
+/.hermes
