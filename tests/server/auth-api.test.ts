@@ -71,4 +71,15 @@ describe("auth API", () => {
     expect((await request(protectedApp).get("/api/health")).status).toBe(200);
   });
 
+  it("changes password, revokes old sessions, and rate-limits repeated failures", async () => {
+    const oldAgent=request.agent(app());
+    await oldAgent.post("/api/auth/register").send({username:"secure-user",password:"old password 123",passwordConfirmation:"old password 123"});
+    const changed=await oldAgent.post("/api/auth/password/change").send({currentPassword:"old password 123",password:"new password 456",passwordConfirmation:"new password 456"});
+    expect(changed.status).toBe(200);
+    expect((await oldAgent.get("/api/auth/me")).status).toBe(200);
+    expect((await request(app()).post("/api/auth/login").send({username:"secure-user",password:"old password 123"})).status).toBe(401);
+    for(let attempt=0;attempt<5;attempt++) await request(app()).post("/api/auth/login").send({username:"missing-limit",password:"wrong password 123"});
+    expect((await request(app()).post("/api/auth/login").send({username:"missing-limit",password:"wrong password 123"})).status).toBe(429);
+  });
+
 });

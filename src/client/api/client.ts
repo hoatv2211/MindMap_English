@@ -24,6 +24,7 @@ export const api = {
   login: (input:{username:string;password:string}) => request<{user:AuthUser}>("/api/auth/login",{method:"POST",body:JSON.stringify(input)}),
   logout: () => request<void>("/api/auth/logout",{method:"POST"}),
   recoverPassword: (input:{username:string;recoveryCode:string;password:string;passwordConfirmation:string}) => request<AuthResult>("/api/auth/password/recover",{method:"POST",body:JSON.stringify(input)}),
+  changePassword: (input:{currentPassword:string;password:string;passwordConfirmation:string}) => request<{user:AuthUser}>("/api/auth/password/change",{method:"POST",body:JSON.stringify(input)}),
   health: () => request<{ ok: boolean; aiOnline: boolean }>("/api/health"),
   dashboard: () => request<Dashboard>("/api/learning/dashboard"),
   topics: () => request<Array<{id:number;slug:string;title:string;titleVi:string;icon:string;color:string;mindmapCount:number}>>("/api/topics"),
