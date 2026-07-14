@@ -82,4 +82,11 @@ describe("auth API", () => {
     expect((await request(app()).post("/api/auth/login").send({username:"missing-limit",password:"wrong password 123"})).status).toBe(429);
   });
 
+  it("rejects cross-site mutations and rate-limits recovery failures", async () => {
+    const protectedApp=app();
+    expect((await request(protectedApp).post("/api/auth/login").set("Origin","https://evil.example").set("Host","localhost").send({username:"nobody",password:"wrong password 123"})).status).toBe(403);
+    for(let attempt=0;attempt<5;attempt++) await request(protectedApp).post("/api/auth/password/recover").send({username:"missing-recovery",recoveryCode:"WRONG-CODE",password:"new password 456",passwordConfirmation:"new password 456"});
+    expect((await request(protectedApp).post("/api/auth/password/recover").send({username:"missing-recovery",recoveryCode:"WRONG-CODE",password:"new password 456",passwordConfirmation:"new password 456"})).status).toBe(429);
+  });
+
 });

@@ -32,7 +32,7 @@ export function createDocumentRouter(repository: DocumentRepository, agent: Agen
   });
   router.post("/:id/vocabulary", (request, response) => {
     const input = z.object({ sectionId: z.number().int().positive(), selectedText: z.string().min(1).max(200), startOffset: z.number().int().nonnegative(), endOffset: z.number().int().positive(), meaningVi: z.string().max(200).default("") }).refine((value) => value.endOffset >= value.startOffset, { path: ["endOffset"], message: "Invalid offsets" }).parse(request.body);
-    const result = repository.addVocabulary(Number(request.params.id), input);
+    const result = repository.addVocabulary(Number(request.params.id), input, (request as AuthenticatedRequest).auth?.id);
     return result ? response.status(201).json(result) : response.status(400).json({ error: "Selection does not match document content" });
   });
   router.post("/:id/extraction-drafts", async (request, response, next) => {

@@ -21,7 +21,7 @@ import { DocumentRepository } from "./modules/documents/repository";
 import { createDocumentRouter } from "./modules/documents/routes";
 import { AuthService } from "./modules/auth/service";
 import { createAuthRouter } from "./modules/auth/routes";
-import { optionalAuth, requireAuth } from "./modules/auth/middleware";
+import { optionalAuth, requireAuth, requireSameOrigin } from "./modules/auth/middleware";
 
 export interface AppDependencies {
   db: AppDatabase;
@@ -45,6 +45,7 @@ export function createApp({ db, config = loadConfig(), nineRouter, includeNotFou
   app.disable("x-powered-by");
   app.use(express.json({ limit: "1mb" }));
   app.use(optionalAuth(auth));
+  app.use("/api", requireSameOrigin);
   app.use("/api/auth", createAuthRouter(auth, config.auth.secureCookies));
   app.get("/api/health", async (_request, response) => response.json({ ok: true, aiOnline: await client.health(), ...agent.getTutorStatus() }));
   if (protectApi) app.use("/api", requireAuth);

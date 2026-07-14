@@ -143,6 +143,21 @@ data/
 - TypeScript strict và production build pass.
 - `npm audit --audit-level=moderate`: 0 vulnerabilities.
 
+## Tài khoản và AI tutor
+
+- Đăng ký bằng `username + password`; mỗi tài khoản có dữ liệu học, tài liệu và hội thoại riêng trong SQLite.
+- Recovery code chỉ hiển thị khi đăng ký hoặc khôi phục mật khẩu. User phải tự lưu; code cũ bị vô hiệu sau khi dùng.
+- AI tutor dùng skill `.hermes/skills/mindmap-english-tutor/SKILL.md`, learner context đã giới hạn từ SQLite và lịch sử chat nhiều thread.
+- Cache chỉ áp dụng cho learner context và câu hỏi kiến thức độc lập; hội thoại nối tiếp luôn gọi AI.
+- Mutation API kiểm tra same-origin, session cookie dùng `HttpOnly` và `SameSite=Lax`.
+
+### Đóng gói lên VPS
+
+- Chạy sau reverse proxy HTTPS và đặt cấu hình production để cookie có `Secure`.
+- Không public trực tiếp SQLite, `DATA_DIR`, thư mục media hoặc backup. Chỉ user chạy service được quyền đọc/ghi `DATA_DIR`.
+- Giữ `NINEROUTER_KEY` trong biến môi trường phía server; không đưa vào bundle frontend.
+- Backup `DATA_DIR` trước migration hoặc deploy phiên bản mới.
+
 ## License
 
 Xem [LICENSE](LICENSE).

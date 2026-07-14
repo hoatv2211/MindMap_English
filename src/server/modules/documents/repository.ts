@@ -58,7 +58,8 @@ export class DocumentRepository {
       start_offset startOffset,end_offset endOffset,source_type sourceType,text_fingerprint textFingerprint FROM document_highlights WHERE id=?`).get(id);
   }
 
-  addVocabulary(documentId: number, input: { sectionId: number; selectedText: string; startOffset: number; endOffset: number; meaningVi: string }) {
+  addVocabulary(documentId: number, input: { sectionId: number; selectedText: string; startOffset: number; endOffset: number; meaningVi: string }, userId?: number) {
+    if (!this.get(documentId, userId)) return null;
     const section = this.db.prepare("SELECT content FROM document_sections WHERE id=? AND document_id=?").get(input.sectionId, documentId) as { content: string } | undefined;
     if (!section || section.content.slice(input.startOffset, input.endOffset) !== input.selectedText) return null;
     const term = input.selectedText.trim();
@@ -69,7 +70,7 @@ export class DocumentRepository {
       const vocabulary = this.db.prepare(`SELECT id,term,normalized_term normalizedTerm,ipa,part_of_speech partOfSpeech,meaning_vi meaningVi,cefr,status,image_url imageUrl,audio_url audioUrl FROM vocabulary WHERE normalized_term=?`).get(normalizedTerm) as { id: number } & Record<string, unknown>;
       if (input.meaningVi.trim()) this.db.prepare("UPDATE vocabulary SET meaning_vi=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(input.meaningVi.trim(), vocabulary.id);
       this.db.prepare("INSERT OR IGNORE INTO review_cards(vocabulary_id) VALUES (?)").run(vocabulary.id);
-      const highlight = this.addHighlight(documentId, { ...input, vocabularyId: vocabulary.id });
+      const highlight = this.addHighlight(documentId, { ...input, vocabularyId: vocabulary.id }, userId);
       return { vocabulary: this.db.prepare(`SELECT id,term,normalized_term normalizedTerm,ipa,part_of_speech partOfSpeech,meaning_vi meaningVi,cefr,status,image_url imageUrl,audio_url audioUrl FROM vocabulary WHERE id=?`).get(vocabulary.id), highlight };
     });
   }

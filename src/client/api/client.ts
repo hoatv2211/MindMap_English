@@ -11,7 +11,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, { ...init, headers: { ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...init?.headers } });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ error: response.statusText }));
-    throw new ApiError(body.error ?? "YÃªu cáº§u tháº¥t báº¡i", response.status, body.code);
+    throw new ApiError(body.error ?? "Yêu cầu thất bại", response.status, body.code);
   }
   const contentType = response.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) return response.json() as Promise<T>;

@@ -1,9 +1,17 @@
 import { expect, test } from "@playwright/test";
+async function authenticate(page: import("@playwright/test").Page, suffix: string) {
+  const username=`e2e-${suffix}`;
+  const password="strong password 123";
+  const registered=await page.request.post("/api/auth/register",{data:{username,password,passwordConfirmation:password}});
+  if(registered.status()===409){const login=await page.request.post("/api/auth/login",{data:{username,password}});expect(login.ok()).toBeTruthy()}else expect(registered.status()).toBe(201);
+}
 
-test("dashboard, library, mindmap and learning flow", async ({ page }) => {
+
+test("dashboard, library, mindmap and learning flow", async ({ page }, testInfo) => {
+  await authenticate(page, testInfo.project.name);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Hôm nay mình nói được gì/ })).toBeVisible();
-  await expect(page.getByText("Học offline")).toBeVisible();
+  await expect(page.getByText(/^(AI sẵn sàng|Học offline)$/)).toBeVisible();
 
   await page.getByRole("button", { name: "Thư viện", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Eating Essentials" })).toBeVisible();
@@ -16,7 +24,8 @@ test("dashboard, library, mindmap and learning flow", async ({ page }) => {
   await expect(page.getByText(/1\/14 từ/)).toBeVisible();
 });
 
-test("imports reading text, saves a sentence, and starts practice", async ({ page }) => {
+test("imports reading text, saves a sentence, and starts practice", async ({ page }, testInfo) => {
+  await authenticate(page, testInfo.project.name);
   const runId = Date.now();
   const filename = `practice-notes-${runId}.txt`;
   const targetSentence = `Could I have the menu please run ${runId}`;
@@ -48,6 +57,7 @@ test("imports reading text, saves a sentence, and starts practice", async ({ pag
 
 test("mobile keeps primary navigation and reading action usable", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "mobile project only");
+  await authenticate(page, testInfo.project.name);
   await page.goto("/");
   await expect(page.getByRole("button", { name: /Học 20 phút/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Thư viện", exact: true })).toBeVisible();

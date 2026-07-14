@@ -79,14 +79,16 @@ export class AuthService {
   logout(token: string | undefined): void { if (token) this.db.prepare("DELETE FROM auth_sessions WHERE token_hash=?").run(tokenHash(token)); }
 
   async recover(input: { username: string; recoveryCode: string; password: string }): Promise<AuthResult> {
+    const bucket = `recover:${normalizeUsername(input.username)}`;
+    this.assertRateLimit(bucket);
     if (input.password.length < 12 || input.password.length > 200) throw new AuthError(400, "WEAK_PASSWORD", "Mật khẩu cần ít nhất 12 ký tự");
     const user = this.db.prepare("SELECT id,username FROM users WHERE normalized_username=? AND status='active'").get(normalizeUsername(input.username)) as {id:number;username:string} | undefined;
     const invalid = () => new AuthError(400, "INVALID_RECOVERY", "Thông tin khôi phục không hợp lệ");
-    if (!user) throw invalid();
+    if (!user) { this.recordFailure(bucket); throw invalid(); }
     const codes = this.db.prepare("SELECT id,code_hash codeHash FROM password_recovery_codes WHERE user_id=? AND consumed_at IS NULL ORDER BY id DESC").all(user.id) as Array<{id:number;codeHash:string}>;
     let matched: {id:number;codeHash:string} | undefined;
     for (const code of codes) if (await verifySecret(input.recoveryCode.trim().toUpperCase(), code.codeHash)) { matched = code; break; }
-    if (!matched) throw invalid();
+    if (!matched) { this.recordFailure(bucket); throw invalid(); }
     const passwordHash = await hashSecret(input.password);
     const nextCode = recoveryCode();
     const nextCodeHash = await hashSecret(nextCode);
@@ -96,6 +98,7 @@ export class AuthService {
       this.db.prepare("DELETE FROM auth_sessions WHERE user_id=?").run(user.id);
       this.db.prepare("INSERT INTO password_recovery_codes(user_id,code_hash) VALUES (?,?)").run(user.id, nextCodeHash);
     });
+    this.db.prepare("DELETE FROM auth_rate_limits WHERE bucket_key=?").run(bucket);
     return { ...this.createSession(user.id, user.username, 1), recoveryCode: nextCode };
   }
 
