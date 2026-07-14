@@ -1,4 +1,4 @@
-import express, { type ErrorRequestHandler } from "express";
+﻿import express, { type ErrorRequestHandler } from "express";
 import { ZodError } from "zod";
 import type { AppDatabase } from "./db/database";
 import { loadConfig, type AppConfig } from "./config";
@@ -19,6 +19,9 @@ import { SpeakingRepository } from "./modules/speaking/repository";
 import { createSpeakingRouter } from "./modules/speaking/routes";
 import { DocumentRepository } from "./modules/documents/repository";
 import { createDocumentRouter } from "./modules/documents/routes";
+import { AuthService } from "./modules/auth/service";
+import { createAuthRouter } from "./modules/auth/routes";
+import { optionalAuth } from "./modules/auth/middleware";
 
 export interface AppDependencies {
   db: AppDatabase;
@@ -36,9 +39,12 @@ export function createApp({ db, config = loadConfig(), nineRouter, includeNotFou
   const backups = new BackupService(db, config);
   const speaking = new SpeakingRepository(db);
   const documents = new DocumentRepository(db, config);
+  const auth = new AuthService(db, config.auth.sessionHours, config.auth.absoluteSessionHours);
 
   app.disable("x-powered-by");
   app.use(express.json({ limit: "1mb" }));
+  app.use(optionalAuth(auth));
+  app.use("/api/auth", createAuthRouter(auth, config.auth.secureCookies));
   app.get("/api/health", async (_request, response) => response.json({ ok: true, aiOnline: await client.health() }));
   app.use("/api", createLibraryRouter(content));
   app.use("/api/mindmaps", createMindmapRouter(content));
@@ -61,4 +67,5 @@ export function createApp({ db, config = loadConfig(), nineRouter, includeNotFou
   app.use(errorHandler);
   return app;
 }
+
 

@@ -8,10 +8,13 @@ const BLOCK_SIZE = 8;
 const PARALLELIZATION = 1;
 const KEY_LENGTH = 64;
 const MAX_MEMORY = 64 * 1024 * 1024;
+function derive(secret: string, salt: Buffer, length: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> {
+  return new Promise((resolve, reject) => nodeScrypt(secret, salt, length, options, (error, key) => error ? reject(error) : resolve(key)));
+}
 
 export async function hashSecret(secret: string): Promise<string> {
   const salt = randomBytes(16);
-  const derived = await scrypt(secret, salt, KEY_LENGTH, { N: COST, r: BLOCK_SIZE, p: PARALLELIZATION, maxmem: MAX_MEMORY }) as Buffer;
+  const derived = await derive(secret, salt, KEY_LENGTH, { N: COST, r: BLOCK_SIZE, p: PARALLELIZATION, maxmem: MAX_MEMORY }) as Buffer;
   return ["scrypt", VERSION, COST, BLOCK_SIZE, PARALLELIZATION, salt.toString("base64url"), derived.toString("base64url")].join("$");
 }
 
@@ -26,9 +29,10 @@ export async function verifySecret(secret: string, encoded: string): Promise<boo
     const salt = Buffer.from(parts[5], "base64url");
     const expected = Buffer.from(parts[6], "base64url");
     if (salt.length !== 16 || expected.length !== KEY_LENGTH) return false;
-    const actual = await scrypt(secret, salt, expected.length, { N: cost, r: blockSize, p: parallelization, maxmem: MAX_MEMORY }) as Buffer;
+    const actual = await derive(secret, salt, expected.length, { N: cost, r: blockSize, p: parallelization, maxmem: MAX_MEMORY }) as Buffer;
     return timingSafeEqual(actual, expected);
   } catch {
     return false;
   }
 }
+
