@@ -1,0 +1,32 @@
+
+> mindmap-english-local-ai@0.1.0 test
+> vitest run tests/client/agent-drawer.test.tsx --reporter=verbose
+
+
+ RUN  v4.1.10 C:/Users/admin/Desktop/_MyProjects/MindMap_English
+
+ × tests/client/agent-drawer.test.tsx > AgentDrawer > shows the backend AI error instead of masking every failure as offline 431ms
+   → Model openai/gpt-5 is unavailable
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/client/agent-drawer.test.tsx > AgentDrawer > shows the backend AI error instead of masking every failure as offline
+Error: Model openai/gpt-5 is unavailable
+ ❯ tests/client/agent-drawer.test.tsx:14:57
+     12| });
+     13|
+     14| beforeEach(() => vi.mocked(api.tutor).mockRejectedValue(new ApiError("…
+       |                                                         ^
+     15|
+     16| describe("AgentDrawer", () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { status: 503, code: 'UPSTREAM' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  08:40:15
+   Duration  3.11s (transform 115ms, setup 243ms, import 515ms, tests 434ms, environment 1.56s)
+

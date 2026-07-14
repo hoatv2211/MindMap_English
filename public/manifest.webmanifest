@@ -1,0 +1,11 @@
+{
+  "name": "MindMap English Local AI",
+  "short_name": "MindMap English",
+  "description": "Học từ vựng tiếng Anh bằng mindmap, SRS và AI gia sư local-first.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5efe5",
+  "theme_color": "#282622",
+  "lang": "vi",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

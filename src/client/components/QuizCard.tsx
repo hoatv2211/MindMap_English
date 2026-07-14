@@ -1,0 +1,14 @@
+import { ArrowRight, Eye, Lightbulb, Volume2 } from "lucide-react";
+import { useState } from "react";
+import type { LearningItem } from "../api/client";
+
+export function QuizCard({item,onGrade,onSpeak}:{item:LearningItem;onGrade:(input:{answer:string;isCorrect:boolean;hintsUsed:number;grade:"again"|"hard"|"good"|"easy"})=>void;onSpeak:(text:string)=>void}){
+  const [answer,setAnswer]=useState("");const [revealed,setRevealed]=useState(false);const [hints,setHints]=useState(0);
+  const normalized=answer.trim().toLowerCase();const correct=normalized===item.term.toLowerCase()||normalized===item.meaningVi.toLowerCase();
+  const prompt=item.activityType==="meaning-recall"?`Từ nào có nghĩa “${item.meaningVi}”?`:item.activityType==="context"?item.example:`Bạn nhớ gì về “${item.term}”?`;
+  return <article className="quiz-card"><div className="quiz-meta"><span>{labelFor(item.activityType)}</span><small>{item.cefr} · {item.status}</small></div><button className="speak-word" onClick={()=>onSpeak(item.term)}><Volume2 size={17}/>Nghe từ</button><h2>{prompt}</h2>{item.activityType!=="meaning-recall"&&<div className="word-focus"><strong>{item.term}</strong><span>{item.ipa}</span></div>}
+    {!revealed?<><label className="answer-field"><span>Câu trả lời của bạn</span><input autoFocus value={answer} onChange={e=>setAnswer(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")setRevealed(true)}} placeholder={item.activityType==="context"?"Giải thích hoặc đặt câu...":"Nhập từ hoặc nghĩa..."}/></label><div className="quiz-actions"><button className="hint-button" onClick={()=>setHints(v=>v+1)}><Lightbulb size={17}/>Gợi ý {hints?`(${hints})`:""}</button><button className="primary-action" onClick={()=>setRevealed(true)}>Kiểm tra <ArrowRight size={17}/></button></div>{hints>0&&<p className="hint-text">Bắt đầu bằng: <b>{item.term.slice(0,Math.min(item.term.length,2+hints))}…</b></p>}</>:
+    <div className="answer-reveal"><span className="reveal-label"><Eye size={16}/>ĐÁP ÁN GỢI Ý</span><strong>{item.term} <small>{item.ipa}</small></strong><p>{item.meaningVi}</p>{item.example&&<blockquote>{item.example}<small>{item.exampleVi}</small></blockquote>}<div className="grade-row"><button onClick={()=>onGrade({answer,isCorrect:correct,hintsUsed:hints,grade:"again"})}><b>Quên</b><small>10 phút</small></button><button onClick={()=>onGrade({answer,isCorrect:correct,hintsUsed:hints,grade:"hard"})}><b>Khó</b><small>1 ngày</small></button><button onClick={()=>onGrade({answer,isCorrect:true,hintsUsed:hints,grade:"good"})}><b>Tốt</b><small>vài ngày</small></button><button onClick={()=>onGrade({answer,isCorrect:true,hintsUsed:hints,grade:"easy"})}><b>Dễ</b><small>lâu hơn</small></button></div></div>}
+  </article>
+}
+function labelFor(type:string){return ({explore:"KHÁM PHÁ", "meaning-recall":"NHỚ NGHĨA",context:"NGỮ CẢNH",collocation:"COLLOCATION",speak:"LUYỆN NÓI","image-choice":"LIÊN TƯỞNG"} as Record<string,string>)[type]??"ÔN TẬP"}
