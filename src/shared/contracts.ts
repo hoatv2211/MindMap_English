@@ -77,3 +77,85 @@ export const MindmapDraftInputSchema = z.object({
   cefr: CefrLevelSchema.default("B1"),
 });
 export type MindmapDraftInput = z.infer<typeof MindmapDraftInputSchema>;
+
+export const DictionaryLookupSchema = z.object({
+  term: z.string().min(1),
+  normalizedTerm: z.string().min(1),
+  known: z.boolean(),
+  existingVocabularyId: z.number().int().positive().nullable(),
+  suggestions: z.array(z.string().min(1)).max(6),
+});
+export type DictionaryLookup = z.infer<typeof DictionaryLookupSchema>;
+
+export const SentenceNotebookEntrySchema = z.object({
+  id: z.number().int().positive(),
+  vocabularyId: z.number().int().positive().nullable(),
+  exampleId: z.number().int().positive().nullable(),
+  sentence: z.string().min(1),
+  translationVi: z.string(),
+  sourceType: z.enum(["quoted", "user", "ai"]),
+  sourceReference: z.string(),
+  fingerprint: z.string().min(1),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+});
+export type SentenceNotebookEntry = z.infer<typeof SentenceNotebookEntrySchema>;
+
+export const TranscriptTokenSchema = z.object({
+  token: z.string(),
+  status: z.enum(["match", "missing", "extra", "replacement"]),
+});
+export type TranscriptToken = z.infer<typeof TranscriptTokenSchema>;
+
+export const SpeakingAttemptSchema = z.object({
+  id: z.number().int().positive(),
+  sessionId: z.number().int().positive(),
+  sentenceId: z.number().int().positive(),
+  targetText: z.string().min(1),
+  transcript: z.string(),
+  diff: z.array(TranscriptTokenSchema),
+  contentScore: z.number().min(0).max(1),
+  durationMs: z.number().int().nonnegative(),
+  createdAt: z.string().min(1),
+});
+export type SpeakingAttempt = z.infer<typeof SpeakingAttemptSchema>;
+
+export const DocumentSummarySchema = z.object({
+  id: z.number().int().positive(),
+  title: z.string().min(1),
+  originalFilename: z.string().min(1),
+  format: z.enum(["txt", "md", "epub"]),
+  mimeType: z.string(),
+  checksum: z.string().min(1),
+  sizeBytes: z.number().int().nonnegative(),
+  sectionCount: z.number().int().nonnegative(),
+  createdAt: z.string().min(1),
+});
+export type DocumentSummary = z.infer<typeof DocumentSummarySchema>;
+
+export const DocumentSectionSchema = z.object({
+  id: z.number().int().positive(),
+  documentId: z.number().int().positive(),
+  heading: z.string(),
+  content: z.string(),
+  sortOrder: z.number().int().nonnegative(),
+  fingerprint: z.string().min(1),
+});
+export type DocumentSection = z.infer<typeof DocumentSectionSchema>;
+
+export const DocumentHighlightSchema = z.object({
+  id: z.number().int().positive(),
+  documentId: z.number().int().positive(),
+  sectionId: z.number().int().positive(),
+  vocabularyId: z.number().int().positive().nullable(),
+  sentenceId: z.number().int().positive().nullable(),
+  selectedText: z.string().min(1),
+  startOffset: z.number().int().nonnegative(),
+  endOffset: z.number().int().nonnegative(),
+  sourceType: z.enum(["quoted", "user", "ai"]),
+  textFingerprint: z.string().min(1),
+}).refine((value) => value.endOffset >= value.startOffset, {
+  message: "endOffset must be greater than or equal to startOffset",
+  path: ["endOffset"],
+});
+export type DocumentHighlight = z.infer<typeof DocumentHighlightSchema>;

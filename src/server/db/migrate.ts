@@ -206,12 +206,97 @@ CREATE TABLE IF NOT EXISTS backups (
   size_bytes INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS sentence_notebook (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  vocabulary_id INTEGER REFERENCES vocabulary(id) ON DELETE SET NULL,
+  example_id INTEGER REFERENCES examples(id) ON DELETE SET NULL,
+  sentence TEXT NOT NULL,
+  translation_vi TEXT NOT NULL DEFAULT '',
+  source_type TEXT NOT NULL CHECK(source_type IN ('quoted','user','ai')) DEFAULT 'user',
+  source_reference TEXT NOT NULL DEFAULT '',
+  fingerprint TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS speaking_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  status TEXT NOT NULL CHECK(status IN ('active','completed','abandoned')) DEFAULT 'active',
+  started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  completed_at TEXT,
+  total_duration_seconds INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS speaking_session_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id INTEGER NOT NULL REFERENCES speaking_sessions(id) ON DELETE CASCADE,
+  sentence_id INTEGER NOT NULL REFERENCES sentence_notebook(id) ON DELETE CASCADE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  completed_at TEXT,
+  UNIQUE(session_id, sentence_id)
+);
+
+CREATE TABLE IF NOT EXISTS speaking_attempts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id INTEGER NOT NULL REFERENCES speaking_sessions(id) ON DELETE CASCADE,
+  session_item_id INTEGER REFERENCES speaking_session_items(id) ON DELETE SET NULL,
+  sentence_id INTEGER NOT NULL REFERENCES sentence_notebook(id) ON DELETE CASCADE,
+  target_text TEXT NOT NULL,
+  transcript TEXT NOT NULL DEFAULT '',
+  diff_json TEXT NOT NULL DEFAULT '[]',
+  content_score REAL NOT NULL DEFAULT 0 CHECK(content_score >= 0 AND content_score <= 1),
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS document_sources (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  original_filename TEXT NOT NULL,
+  storage_path TEXT NOT NULL,
+  format TEXT NOT NULL CHECK(format IN ('txt','md','epub')),
+  mime_type TEXT NOT NULL DEFAULT '',
+  checksum TEXT NOT NULL UNIQUE,
+  size_bytes INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS document_sections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  document_id INTEGER NOT NULL REFERENCES document_sources(id) ON DELETE CASCADE,
+  heading TEXT NOT NULL DEFAULT '',
+  content TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  fingerprint TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(document_id, sort_order)
+);
+
+CREATE TABLE IF NOT EXISTS document_highlights (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  document_id INTEGER NOT NULL REFERENCES document_sources(id) ON DELETE CASCADE,
+  section_id INTEGER NOT NULL REFERENCES document_sections(id) ON DELETE CASCADE,
+  vocabulary_id INTEGER REFERENCES vocabulary(id) ON DELETE SET NULL,
+  sentence_id INTEGER REFERENCES sentence_notebook(id) ON DELETE SET NULL,
+  selected_text TEXT NOT NULL,
+  start_offset INTEGER NOT NULL CHECK(start_offset >= 0),
+  end_offset INTEGER NOT NULL CHECK(end_offset >= start_offset),
+  source_type TEXT NOT NULL CHECK(source_type IN ('quoted','user','ai')) DEFAULT 'quoted',
+  text_fingerprint TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_topics_sort ON topics(sort_order);
 CREATE INDEX IF NOT EXISTS idx_mindmaps_topic ON mindmaps(topic_id, status);
 CREATE INDEX IF NOT EXISTS idx_nodes_map ON mindmap_nodes(mindmap_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_review_due ON review_cards(due_at);
 CREATE INDEX IF NOT EXISTS idx_attempts_vocab ON review_attempts(vocabulary_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON generation_jobs(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_notebook_created ON sentence_notebook(created_at);
+CREATE INDEX IF NOT EXISTS idx_speaking_attempts_session ON speaking_attempts(session_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_document_sections_source ON document_sections(document_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_document_highlights_section ON document_highlights(section_id, start_offset);
 `;
 
 export function migrate(db: AppDatabase): void {

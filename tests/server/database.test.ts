@@ -20,6 +20,11 @@ describe("database migration", () => {
       "topics", "mindmaps", "mindmap_nodes", "vocabulary", "review_cards",
       "learning_sessions", "generation_jobs", "settings", "backups",
     ]));
+    expect(names).toEqual(expect.arrayContaining([
+      "sentence_notebook", "speaking_sessions", "speaking_session_items",
+      "speaking_attempts", "document_sources", "document_sections",
+      "document_highlights",
+    ]));
     expect(db.pragma("foreign_keys", { simple: true })).toBe(1);
   });
 
