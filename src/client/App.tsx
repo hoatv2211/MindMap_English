@@ -8,6 +8,8 @@ import { CreateMindmapPage } from "./pages/CreateMindmapPage";
 import { LearningPage } from "./pages/LearningPage";
 import { ProgressPage } from "./pages/ProgressPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { PracticePage } from "./pages/PracticePage";
+import { ReadingPage } from "./pages/ReadingPage";
 
-function AppContent(){const {page,agentOpen}=useAppStore();const pages={today:<TodayPage/>,library:<LibraryPage/>,mindmap:<MindmapPage/>,create:<CreateMindmapPage/>,learning:<LearningPage/>,progress:<ProgressPage/>,settings:<SettingsPage/>};return <AppShell>{pages[page]}{agentOpen&&<AgentDrawer/>}</AppShell>}
+function AppContent(){const {page,agentOpen}=useAppStore();const pages={today:<TodayPage/>,library:<LibraryPage/>,mindmap:<MindmapPage/>,create:<CreateMindmapPage/>,learning:<LearningPage/>,practice:<PracticePage/>,reading:<ReadingPage/>,progress:<ProgressPage/>,settings:<SettingsPage/>};return <AppShell>{pages[page]}{agentOpen&&<AgentDrawer/>}</AppShell>}
 export function App(){return <AppStoreProvider><AppContent/></AppStoreProvider>}

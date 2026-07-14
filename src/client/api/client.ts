@@ -1,4 +1,4 @@
-import type { Dashboard, Mindmap } from "../../shared/contracts";
+import type { Dashboard, DictionaryLookup, Mindmap } from "../../shared/contracts";
 
 export class ApiError extends Error {
   constructor(message: string, readonly status: number, readonly code?: string) { super(message); }
@@ -39,6 +39,20 @@ export const api = {
   backups: () => request<Array<{id:number;filename:string;sizeBytes:number;createdAt:string}>>("/api/backups"),
   createBackup: () => request("/api/backups",{method:"POST"}),
   restoreBackup: (id:number) => request(`/api/backups/${id}/restore`,{method:"POST"}),
+  dictionaryLookup: (term:string) => request<DictionaryLookup>(`/api/dictionary/lookup?term=${encodeURIComponent(term)}`),
+  dictionaryComplete: (prefix:string) => request<{items:string[]}>(`/api/dictionary/complete?prefix=${encodeURIComponent(prefix)}`),
+  speakingNotebook: () => request<NotebookEntry[]>("/api/speaking/notebook"),
+  addNotebookSentence: (input:Record<string,unknown>) => request<NotebookEntry>("/api/speaking/notebook",{method:"POST",body:JSON.stringify(input)}),
+  createSpeakingSession: (sentenceIds:number[]) => request<SpeakingSessionResult>("/api/speaking/sessions",{method:"POST",body:JSON.stringify({sentenceIds})}),
+  speakingAttempt: (sessionId:number,input:{sentenceId:number;transcript:string;durationMs:number}) => request<SpeakingAttemptResult>(`/api/speaking/sessions/${sessionId}/attempts`,{method:"POST",body:JSON.stringify(input)}),
+  completeSpeakingSession: (sessionId:number) => request<SpeakingSessionResult>(`/api/speaking/sessions/${sessionId}/complete`,{method:"POST"}),
+  speakingMetrics: () => request<{attempts7d:number;speakingSeconds7d:number}>("/api/speaking/metrics"),
+  documents: () => request<DocumentSummaryResult[]>("/api/documents"),
+  document: (id:number) => request<DocumentDetail>(`/api/documents/${id}`),
+  uploadDocument: (file:File,title?:string) => {const form=new FormData();form.append("document",file);if(title)form.append("title",title);return request<DocumentDetail>("/api/documents",{method:"POST",body:form});},
+  addDocumentHighlight: (documentId:number,input:{sectionId:number;selectedText:string;startOffset:number;endOffset:number;vocabularyId?:number|null;sentenceId?:number|null}) => request(`/api/documents/${documentId}/highlights`,{method:"POST",body:JSON.stringify(input)}),
+  createDocumentVocabulary: (documentId:number,input:{sectionId:number;selectedText:string;startOffset:number;endOffset:number;meaningVi:string}) => request<{vocabulary:{id:number;term:string};highlight:{id:number;vocabularyId:number}}>(`/api/documents/${documentId}/vocabulary`,{method:"POST",body:JSON.stringify(input)}),
+  extractDocumentDraft: (documentId:number,sectionIds:number[]) => request<DocumentExtractionResult>(`/api/documents/${documentId}/extraction-drafts`,{method:"POST",body:JSON.stringify({sectionIds})}),
 };
 
 export interface LearningItem { id:number;vocabularyId:number;activityType:string;sortOrder:number;isNew:number;term:string;meaningVi:string;ipa:string;cefr:string;status:string;example:string;exampleVi:string; }
@@ -48,3 +62,12 @@ export interface GeneratedWord {term:string;meaningVi:string;ipa:string;cefr:str
 export interface GeneratedBranch {label:string;meaningVi:string;color:"coral"|"amber"|"leaf"|"sky"|"violet";words:GeneratedWord[]}
 export interface GeneratedResult {jobId:number;draft:{title:string;description:string;branches:GeneratedBranch[]};duplicates:Array<{term:string;meaningVi:string}>}
 export interface Settings {nineRouterUrl:string;hasNineRouterKey:boolean;models:Record<string,string>;defaultDuration?:number;ttsVoice?:string;}
+export interface NotebookEntry {id:number;vocabularyId:number|null;exampleId:number|null;sentence:string;translationVi:string;sourceType:"quoted"|"user"|"ai";sourceReference:string;fingerprint:string;createdAt:string;updatedAt:string}
+export interface SpeakingSessionItem {id:number;sentenceId:number;sortOrder:number;completedAt:string|null;sentence:string;translationVi:string}
+export interface SpeakingSessionResult {id:number;status:"active"|"completed"|"abandoned";startedAt:string;completedAt:string|null;totalDurationSeconds:number;items:SpeakingSessionItem[]}
+export interface SpeakingAttemptResult {id:number;sessionId:number;sentenceId:number;targetText:string;transcript:string;diff:import("../../shared/contracts").TranscriptToken[];contentScore:number;durationMs:number;createdAt:string}
+export interface DocumentSummaryResult {id:number;title:string;originalFilename:string;format:"txt"|"md"|"epub";mimeType:string;checksum:string;sizeBytes:number;sectionCount:number;createdAt:string}
+export interface DocumentSectionResult {id:number;documentId:number;heading:string;content:string;sortOrder:number;fingerprint:string}
+export interface DocumentDetail extends DocumentSummaryResult {storagePath:string;sections:DocumentSectionResult[]}
+export interface ExtractionCandidate {category:"recommended"|"optional"|"skip";reason:string}
+export interface DocumentExtractionResult {jobId:number;draft:{vocabulary:Array<ExtractionCandidate&{term:string;meaningVi:string}>;sentences:Array<ExtractionCandidate&{sentence:string}>}}

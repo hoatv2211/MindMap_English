@@ -26,7 +26,10 @@ if (fs.existsSync(distDir)) {
   app.get("/", (_request, response) => response.status(503).send("Client build missing. Run npm run build."));
 }
 const server = app.listen(config.port, config.host, () => console.log(`MindMap English running at http://${config.host}:${config.port}`));
-const shutdown = () => server.close(() => { db.close(); process.exit(0); });
+const shutdown = () => {
+  server.closeAllConnections();
+  server.close(() => { db.close(); process.exit(0); });
+};
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 

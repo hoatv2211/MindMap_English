@@ -14,6 +14,11 @@ import { createAgentRouter } from "./modules/agent/routes";
 import { createSpeechRouter } from "./modules/speech/routes";
 import { createBackupRouter } from "./routes/backup";
 import { createSettingsRouter } from "./routes/settings";
+import { createDictionaryRouter } from "./modules/dictionary/routes";
+import { SpeakingRepository } from "./modules/speaking/repository";
+import { createSpeakingRouter } from "./modules/speaking/routes";
+import { DocumentRepository } from "./modules/documents/repository";
+import { createDocumentRouter } from "./modules/documents/routes";
 
 export interface AppDependencies {
   db: AppDatabase;
@@ -29,6 +34,8 @@ export function createApp({ db, config = loadConfig(), nineRouter, includeNotFou
   const client = nineRouter ?? new NineRouterClient(config.nineRouter);
   const agent = new AgentToolService(db, content, learning, client);
   const backups = new BackupService(db, config);
+  const speaking = new SpeakingRepository(db);
+  const documents = new DocumentRepository(db, config);
 
   app.disable("x-powered-by");
   app.use(express.json({ limit: "1mb" }));
@@ -40,6 +47,9 @@ export function createApp({ db, config = loadConfig(), nineRouter, includeNotFou
   app.use("/api/speech", createSpeechRouter(client));
   app.use("/api/backups", createBackupRouter(backups));
   app.use("/api/settings", createSettingsRouter(db, config, client));
+  app.use("/api/dictionary", createDictionaryRouter(db, config));
+  app.use("/api/speaking", createSpeakingRouter(speaking));
+  app.use("/api/documents", createDocumentRouter(documents, agent));
   if (includeNotFound) app.use((_request, response) => response.status(404).json({ error: "Route not found" }));
 
   const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {

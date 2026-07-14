@@ -15,6 +15,11 @@ export const GeneratedMindmapSchema = z.object({
 });
 export type GeneratedMindmap = z.infer<typeof GeneratedMindmapSchema>;
 
+export const DocumentExtractionSchema = z.object({
+  vocabulary: z.array(z.object({ term: z.string().min(1), meaningVi: z.string().min(1), category: z.enum(["recommended", "optional", "skip"]), reason: z.string().min(1).max(200) })).max(30),
+  sentences: z.array(z.object({ sentence: z.string().min(1), category: z.enum(["recommended", "optional", "skip"]), reason: z.string().min(1).max(200) })).max(20),
+});
+
 export class AgentToolService {
   constructor(
     private readonly db: AppDatabase,
@@ -69,6 +74,22 @@ export class AgentToolService {
       { role: "user", content: message },
     ]);
     return { reply, suggestions: [] };
+  }
+
+  async generateDocumentExtractionDraft(documentId: number, sectionIds: number[], text: string) {
+    const request = { documentId, sectionIds };
+    const jobId = Number(this.db.prepare("INSERT INTO generation_jobs(job_type,status,request_json) VALUES ('document-extraction','running',?)").run(JSON.stringify(request)).lastInsertRowid);
+    try {
+      const draft = await this.client.chatJson(DocumentExtractionSchema, [
+        { role: "system", content: "Extract practical English learning candidates for a Vietnamese learner. Return JSON only. Do not invent quotations. Categorize each item as recommended, optional, or skip and provide one short reason." },
+        { role: "user", content: `Source text:\n${text.slice(0, 30000)}\n\nReturn: {"vocabulary":[{"term":"...","meaningVi":"...","category":"recommended|optional|skip","reason":"..."}],"sentences":[{"sentence":"...","category":"recommended|optional|skip","reason":"..."}]}` },
+      ]);
+      this.db.prepare("UPDATE generation_jobs SET status='completed',result_json=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(JSON.stringify(draft), jobId);
+      return { jobId, draft };
+    } catch (error) {
+      this.db.prepare("UPDATE generation_jobs SET status='failed',error=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(error instanceof Error ? error.message : "Unknown error", jobId);
+      throw error;
+    }
   }
 
   private findDuplicates(generated: GeneratedMindmap) {
