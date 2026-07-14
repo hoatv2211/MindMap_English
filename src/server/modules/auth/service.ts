@@ -30,6 +30,7 @@ export class AuthService {
     const userId = withTransaction(this.db, () => {
       const id = Number(this.db.prepare("INSERT INTO users(username,normalized_username,password_hash) VALUES (?,?,?)").run(username, normalized, passwordHash).lastInsertRowid);
       this.db.prepare("INSERT INTO password_recovery_codes(user_id,code_hash) VALUES (?,?)").run(id, codeHash);
+      this.db.prepare("INSERT INTO user_learning_progress(user_id) VALUES (?)").run(id);
       return id;
     });
     return { ...this.createSession(userId, username, 1), recoveryCode: code };

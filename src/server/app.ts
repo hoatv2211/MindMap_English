@@ -21,16 +21,17 @@ import { DocumentRepository } from "./modules/documents/repository";
 import { createDocumentRouter } from "./modules/documents/routes";
 import { AuthService } from "./modules/auth/service";
 import { createAuthRouter } from "./modules/auth/routes";
-import { optionalAuth } from "./modules/auth/middleware";
+import { optionalAuth, requireAuth } from "./modules/auth/middleware";
 
 export interface AppDependencies {
   db: AppDatabase;
   config?: AppConfig;
   nineRouter?: NineRouterClient;
   includeNotFound?: boolean;
+  protectApi?: boolean;
 }
 
-export function createApp({ db, config = loadConfig(), nineRouter, includeNotFound = true }: AppDependencies) {
+export function createApp({ db, config = loadConfig(), nineRouter, includeNotFound = true, protectApi = process.env.NODE_ENV !== "test" }: AppDependencies) {
   const app = express();
   const content = new ContentRepository(db);
   const learning = new LearningRepository(db);
@@ -45,7 +46,8 @@ export function createApp({ db, config = loadConfig(), nineRouter, includeNotFou
   app.use(express.json({ limit: "1mb" }));
   app.use(optionalAuth(auth));
   app.use("/api/auth", createAuthRouter(auth, config.auth.secureCookies));
-  app.get("/api/health", async (_request, response) => response.json({ ok: true, aiOnline: await client.health() }));
+  app.get("/api/health", async (_request, response) => response.json({ ok: true, aiOnline: await client.health(), ...agent.getTutorStatus() }));
+  if (protectApi) app.use("/api", requireAuth);
   app.use("/api", createLibraryRouter(content));
   app.use("/api/mindmaps", createMindmapRouter(content));
   app.use("/api/learning", createLearningRouter(learning));

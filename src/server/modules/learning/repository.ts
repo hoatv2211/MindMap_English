@@ -9,7 +9,7 @@ interface CandidateRow { vocabulary_id: number; status: SessionCandidate["status
 export class LearningRepository {
   constructor(private readonly db: AppDatabase, private readonly clock: () => Date = () => new Date()) {}
 
-  createSession(duration: 10 | 20) {
+  createSession(duration: 10 | 20, userId?: number) {
     return withTransaction(this.db, () => {
       const now = this.clock();
       const rows = this.db.prepare(`
@@ -24,15 +24,15 @@ export class LearningRepository {
         isNew: row.repetitions === 0 && row.status === "new", lapses: row.lapses,
       }));
       const plan = buildSession(candidates, duration);
-      const sessionId = Number(this.db.prepare("INSERT INTO learning_sessions(duration_minutes) VALUES (?)").run(duration).lastInsertRowid);
+      const sessionId = Number(this.db.prepare("INSERT INTO learning_sessions(duration_minutes,user_id) VALUES (?,?)").run(duration, userId ?? null).lastInsertRowid);
       const insert = this.db.prepare("INSERT INTO session_items(session_id,vocabulary_id,activity_type,sort_order,is_new) VALUES (?,?,?,?,?)");
       plan.forEach((item) => insert.run(sessionId, item.vocabularyId, item.activityType, item.sortOrder, item.isNew ? 1 : 0));
-      return this.getSession(sessionId)!;
+      return this.getSession(sessionId, userId)!;
     });
   }
 
-  getSession(id: number) {
-    const session = this.db.prepare("SELECT * FROM learning_sessions WHERE id=?").get(id) as Record<string, unknown> | undefined;
+  getSession(id: number, userId?: number) {
+    const session = this.db.prepare(`SELECT * FROM learning_sessions WHERE id=? ${userId === undefined ? "" : "AND user_id=?"}`).get(...(userId === undefined ? [id] : [id, userId])) as Record<string, unknown> | undefined;
     if (!session) return null;
     const items = this.db.prepare(`
       SELECT si.id, si.vocabulary_id vocabularyId, si.activity_type activityType, si.sort_order sortOrder, si.is_new isNew,
@@ -48,7 +48,7 @@ export class LearningRepository {
     };
   }
 
-  recordAttempt(input: { sessionId: number; vocabularyId: number; promptType: string; answer: string; isCorrect: boolean; responseMs: number; hintsUsed: number; grade: ReviewGrade }) {
+  recordAttempt(input: { sessionId: number; vocabularyId: number; promptType: string; answer: string; isCorrect: boolean; responseMs: number; hintsUsed: number; grade: ReviewGrade; userId?: number }) {
     return withTransaction(this.db, () => {
       const card = this.db.prepare("SELECT * FROM review_cards WHERE vocabulary_id=?").get(input.vocabularyId) as {
         stability: number; difficulty: number; interval_days: number; repetitions: number; lapses: number;
@@ -56,12 +56,16 @@ export class LearningRepository {
       if (!card) throw new Error("Review card not found");
       const now = this.clock();
       const schedule = scheduleReview({ stability: card.stability, difficulty: card.difficulty, intervalDays: card.interval_days, repetitions: card.repetitions, lapses: card.lapses }, input.grade, now);
-      this.db.prepare(`INSERT INTO review_attempts(session_id,vocabulary_id,prompt_type,answer,is_correct,response_ms,hints_used,grade) VALUES (?,?,?,?,?,?,?,?)`)
-        .run(input.sessionId, input.vocabularyId, input.promptType, input.answer, input.isCorrect ? 1 : 0, input.responseMs, input.hintsUsed, input.grade);
+      this.db.prepare(`INSERT INTO review_attempts(session_id,vocabulary_id,prompt_type,answer,is_correct,response_ms,hints_used,grade,user_id) VALUES (?,?,?,?,?,?,?,?,?)`)
+        .run(input.sessionId, input.vocabularyId, input.promptType, input.answer, input.isCorrect ? 1 : 0, input.responseMs, input.hintsUsed, input.grade, input.userId ?? null);
       this.db.prepare(`UPDATE review_cards SET stability=?,difficulty=?,interval_days=?,repetitions=?,lapses=?,due_at=?,last_reviewed_at=? WHERE vocabulary_id=?`)
         .run(schedule.stability, schedule.difficulty, schedule.intervalDays, schedule.repetitions, schedule.lapses, schedule.dueAt, schedule.reviewedAt, input.vocabularyId);
       const nextStatus = input.grade === "again" ? "weak" : schedule.repetitions >= 4 ? "stable" : "learning";
       this.db.prepare("UPDATE vocabulary SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(nextStatus, input.vocabularyId);
+      if (input.userId !== undefined) {
+        this.db.prepare("INSERT INTO user_vocabulary_state(user_id,vocabulary_id,status) VALUES (?,?,?) ON CONFLICT(user_id,vocabulary_id) DO UPDATE SET status=excluded.status,updated_at=CURRENT_TIMESTAMP").run(input.userId,input.vocabularyId,nextStatus);
+        this.db.prepare("UPDATE users SET profile_revision=profile_revision+1,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(input.userId);
+      }
       return schedule;
     });
   }

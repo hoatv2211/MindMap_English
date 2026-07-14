@@ -332,6 +332,21 @@ CREATE TABLE IF NOT EXISTS auth_rate_limits (
   window_started_at TEXT NOT NULL,
   blocked_until TEXT
 );
+CREATE TABLE IF NOT EXISTS user_learning_progress (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  xp INTEGER NOT NULL DEFAULT 0,
+  streak INTEGER NOT NULL DEFAULT 0,
+  weekly_goal_minutes INTEGER NOT NULL DEFAULT 100,
+  last_study_date TEXT,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS user_vocabulary_state (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  vocabulary_id INTEGER NOT NULL REFERENCES vocabulary(id) ON DELETE CASCADE,
+  status TEXT NOT NULL CHECK(status IN ('new','learning','weak','stable')) DEFAULT 'new',
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(user_id,vocabulary_id)
+);
 CREATE TABLE IF NOT EXISTS learner_context_cache (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   profile_revision INTEGER NOT NULL,
@@ -362,7 +377,16 @@ function ensureColumn(db: AppDatabase, table: string, column: string, definition
 export function migrate(db: AppDatabase): void {
   db.exec(migrationSql);
   db.exec(authMigrationSql);
-  ensureColumn(db, "agent_threads", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
+  ensureColumn(db, "mindmaps", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
+  ensureColumn(db, "learning_sessions", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
+  ensureColumn(db, "review_attempts", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
+  ensureColumn(db, "sentence_notebook", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
+  ensureColumn(db, "speaking_sessions", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
+  ensureColumn(db, "speaking_attempts", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
+  ensureColumn(db, "document_sources", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
+  ensureColumn(db, "document_highlights", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
+  ensureColumn(db, "generation_jobs", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
+  ensureColumn(db, "backups", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");  ensureColumn(db, "agent_threads", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
   ensureColumn(db, "agent_threads", "archived_at", "TEXT");
   ensureColumn(db, "agent_messages", "status", "TEXT NOT NULL DEFAULT 'completed'");
   ensureColumn(db, "agent_messages", "model", "TEXT NOT NULL DEFAULT ''");
@@ -372,4 +396,5 @@ export function migrate(db: AppDatabase): void {
   db.prepare("INSERT OR IGNORE INTO schema_migrations(version) VALUES (1)").run();
   db.prepare("INSERT OR IGNORE INTO user_progress(id) VALUES (1)").run();
 }
+
 

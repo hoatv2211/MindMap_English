@@ -23,7 +23,8 @@ describe("persistent tutor chat",()=>{
 
   it("builds and reuses a bounded learner context by profile revision",()=>{
     const id=user("learner");
-    db.prepare("INSERT INTO vocabulary(term,normalized_term,meaning_vi,status) VALUES ('book','book','sách','weak')").run();
+    const vocabularyId=Number(db.prepare("INSERT INTO vocabulary(term,normalized_term,meaning_vi,status) VALUES ('book','book','sách','weak')").run().lastInsertRowid);
+    db.prepare("INSERT INTO user_vocabulary_state(user_id,vocabulary_id,status) VALUES (?,?,'weak')").run(id,vocabularyId);
     const service=new LearnerContextService(db);
     const first=service.get(id,"1.0.0");const second=service.get(id,"1.0.0");
     expect(first.snapshot.vocabulary.weak).toBe(1);

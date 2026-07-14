@@ -65,4 +65,10 @@ describe("auth API", () => {
     const wrong = await request(app()).post("/api/auth/login").send({ username: "SameName", password: "wrong password 123" });
     expect(missing.body).toEqual(wrong.body);
   });
+  it("protects application APIs when production gate is enabled", async () => {
+    const protectedApp=createApp({db,config:{host:"127.0.0.1",port:8787,dataDir:".",databasePath:":memory:",mediaDir:".",backupDir:".",auth:{secureCookies:false,sessionHours:24,absoluteSessionHours:168},nineRouter:{url:"http://localhost:20128",key:"",chatModel:"",imageModel:"",sttModel:"",ttsModel:"",ttsVoice:""}},nineRouter:{health:async()=>false} as never,protectApi:true});
+    expect((await request(protectedApp).get("/api/learning/dashboard")).status).toBe(401);
+    expect((await request(protectedApp).get("/api/health")).status).toBe(200);
+  });
+
 });
