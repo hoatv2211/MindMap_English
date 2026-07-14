@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+﻿import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AppDatabase } from "../../src/server/db/database";
 import { createDatabase } from "../../src/server/db/database";
 import { migrate } from "../../src/server/db/migrate";
@@ -23,7 +23,8 @@ describe("database migration", () => {
     expect(names).toEqual(expect.arrayContaining([
       "sentence_notebook", "speaking_sessions", "speaking_session_items",
       "speaking_attempts", "document_sources", "document_sections",
-      "document_highlights",
+      "document_highlights", "users", "auth_sessions", "password_recovery_codes",
+      "auth_rate_limits", "learner_context_cache", "agent_response_cache",
     ]));
     expect(db.pragma("foreign_keys", { simple: true })).toBe(1);
   });
@@ -39,3 +40,5 @@ describe("database migration", () => {
     expect(wordCount).toBeGreaterThanOrEqual(18);
   });
 });
+
+
