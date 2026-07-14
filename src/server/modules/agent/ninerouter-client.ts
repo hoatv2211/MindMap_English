@@ -17,6 +17,8 @@ export interface ChatMessage { role: "system" | "user" | "assistant"; content: s
 export class NineRouterClient {
   constructor(private readonly config: AppConfig["nineRouter"], private readonly fetchImpl: typeof fetch = fetch) {}
 
+  getChatModel(): string { return this.config.chatModel; }
+
   private headers(json = true): Record<string, string> {
     return {
       ...(json ? { "Content-Type": "application/json" } : {}),
@@ -106,4 +108,3 @@ export class NineRouterClient {
     return { buffer: Buffer.from(await response.arrayBuffer()), mimeType: response.headers.get("content-type") || "audio/mpeg" };
   }
 }
-

@@ -56,12 +56,13 @@ interface NodeRow {
 export class ContentRepository {
   constructor(private readonly db: AppDatabase) {}
 
-  listTopics(_userId?: number) {
+  listTopics(userId?: number) {
+    const ownerCount=userId===undefined?"1=1":"(m.source='seed' OR m.user_id=?)";
     return (this.db.prepare(`
-      SELECT t.*, COUNT(CASE WHEN m.status='approved' THEN 1 END) mindmap_count
+      SELECT t.*, COUNT(CASE WHEN m.status='approved' AND ${ownerCount} THEN 1 END) mindmap_count
       FROM topics t LEFT JOIN mindmaps m ON m.topic_id=t.id
       GROUP BY t.id ORDER BY t.sort_order, t.id
-    `).all() as Array<TopicRow & { mindmap_count: number }>).map((row) => ({
+    `).all(...(userId===undefined?[]:[userId])) as Array<TopicRow & { mindmap_count: number }>).map((row) => ({
       id: row.id, slug: row.slug, title: row.title, titleVi: row.title_vi,
       description: row.description, icon: row.icon, color: row.color,
       mindmapCount: row.mindmap_count,
@@ -124,6 +125,7 @@ export class ContentRepository {
           insertVocabulary.run(term, normalized, node.meaningVi, node.ipa, term.includes(" ") ? "phrase" : "word", node.cefr);
           vocabularyId = (getVocabulary.get(normalized) as { id: number }).id;
           insertReview.run(vocabularyId);
+          if (userId !== undefined) this.db.prepare("INSERT OR IGNORE INTO user_vocabulary_state(user_id,vocabulary_id,status) VALUES (?,?,'new')").run(userId,vocabularyId);
         }
         const parentId = node.parentIndex === null ? null : nodeIds[node.parentIndex] ?? null;
         const nodeId = Number(insertNode.run(mapId, parentId, vocabularyId, node.nodeType, node.label, node.meaningVi, node.ipa, node.color, node.x, node.y, index).lastInsertRowid);
@@ -136,7 +138,7 @@ export class ContentRepository {
 
   updateMindmapNode(mapId: number, nodeId: number, input: UpdateNodeInput, userId?: number): MindmapNode | null {
     const parsed = UpdateNodeSchema.parse(input);
-    if (!this.getMindmap(mapId, userId)) return null;
+    if (userId === undefined ? !this.getMindmap(mapId) : !this.db.prepare("SELECT 1 FROM mindmaps WHERE id=? AND user_id=? AND status!='trashed'").get(mapId,userId)) return null;
     const existing = this.db.prepare("SELECT * FROM mindmap_nodes WHERE id=? AND mindmap_id=?").get(nodeId, mapId) as Record<string, unknown> | undefined;
     if (!existing) return null;
     const fields: string[] = [];

@@ -232,3 +232,18 @@
 - Client tests prove account gate and full chat lifecycle.
 - E2E proves two-account isolation across reloads and responsive layouts.
 - Full test, typecheck, build, E2E, and audit outputs are recorded before completion claim.
+
+## Verified Completion ? 2026-07-14
+
+- [x] Account credentials, opaque sessions, one-time recovery code, revocation, username/IP rate limits.
+- [x] Shared SQLite with strict user ownership for settings, learning, documents, speaking, mindmaps, generation, backups, and tutor chat.
+- [x] Dedicated `.hermes/skills/mindmap-english-tutor/SKILL.md`, bounded learner context, profile-revision invalidation, selective response cache.
+- [x] Persistent tutor threads with create, reopen, rename, archive, restore, delete confirmation, failed-message reload, and retry.
+- [x] Backup archives redact password/session/recovery/cache secrets; restore preserves live credentials.
+- [x] Local-first defaults and explicit VPS remote-binding/secure-cookie opt-in documented.
+- [x] Unit/integration: `31` files, `98` tests passed.
+- [x] Focused migration/security audit: `4` files, `16` tests passed.
+- [x] Typecheck passed: `tsc --noEmit`.
+- [x] Production build passed: Vite `1965` modules transformed.
+- [x] E2E passed: `7` passed, `3` intentional project skips, including two-account tutor-thread isolation.
+- [x] Dependency audit passed: `0 vulnerabilities`.

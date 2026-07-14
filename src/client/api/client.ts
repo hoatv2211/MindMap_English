@@ -1,15 +1,17 @@
-﻿import type { Dashboard, DictionaryLookup, Mindmap } from "../../shared/contracts";
+import type { Dashboard, DictionaryLookup, Mindmap } from "../../shared/contracts";
 
 export interface AuthUser { id:number; username:string; profileRevision:number }
 export interface AuthResult { user:AuthUser; recoveryCode:string }
+export const AUTH_UNAUTHORIZED_EVENT = "mindmap-english:unauthorized";
 
 export class ApiError extends Error {
   constructor(message: string, readonly status: number, readonly code?: string) { super(message); }
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, { ...init, headers: { ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...init?.headers } });
+  const response = await fetch(path, { credentials: "same-origin", ...init, headers: { ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...init?.headers } });
   if (!response.ok) {
+    if (response.status === 401 && path !== "/api/auth/me" && typeof window !== "undefined") window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
     const body = await response.json().catch(() => ({ error: response.statusText }));
     throw new ApiError(body.error ?? "Yêu cầu thất bại", response.status, body.code);
   }
@@ -38,11 +40,14 @@ export const api = {
   progress: () => request<Progress>("/api/learning/progress"),
   tutor: (message:string) => request<{reply:string;suggestions:string[];threadId:number}>("/api/agent/chat",{method:"POST",body:JSON.stringify({message})}),
   agentStatus: () => request<{skill:string;skillVersion:string;degraded:boolean}>("/api/agent/status"),
-  agentThreads: () => request<AgentThread[]>("/api/agent/threads"),
+  agentThreads: (archived=false) => request<AgentThread[]>(`/api/agent/threads${archived?"?archived=true":""}`),
   createAgentThread: (title?:string) => request<AgentThread>("/api/agent/threads",{method:"POST",body:JSON.stringify({title})}),
   agentMessages: (threadId:number) => request<AgentMessage[]>(`/api/agent/threads/${threadId}/messages`),
   sendAgentMessage: (threadId:number,message:string) => request<{reply:string;message:AgentMessage;suggestions:string[];responseCacheHit:boolean;skill:{degraded:boolean}}>(`/api/agent/threads/${threadId}/messages`,{method:"POST",body:JSON.stringify({message})}),
   archiveAgentThread: (threadId:number) => request<void>(`/api/agent/threads/${threadId}`,{method:"PATCH",body:JSON.stringify({archived:true})}),
+  restoreAgentThread: (threadId:number) => request<void>(`/api/agent/threads/${threadId}`,{method:"PATCH",body:JSON.stringify({archived:false})}),
+  renameAgentThread: (threadId:number,title:string) => request<void>(`/api/agent/threads/${threadId}`,{method:"PATCH",body:JSON.stringify({title})}),
+  retryAgentMessage: (threadId:number,messageId:number) => request<{reply:string;message:AgentMessage;suggestions:string[]}>(`/api/agent/threads/${threadId}/messages/${messageId}/retry`,{method:"POST"}),
   deleteAgentThread: (threadId:number) => request<void>(`/api/agent/threads/${threadId}`,{method:"DELETE"}),
   generateMindmap: (input:Record<string,unknown>) => request<GeneratedResult>("/api/agent/mindmap-drafts",{method:"POST",body:JSON.stringify(input)}),
   saveGeneratedMindmap: (topicId:number,draft:unknown) => request<Mindmap>("/api/agent/mindmap-drafts/save",{method:"POST",body:JSON.stringify({topicId,draft})}),
@@ -91,4 +96,3 @@ export interface DocumentExtractionResult {jobId:number;draft:{vocabulary:Array<
 
 export interface AgentThread {id:number;title:string;preview?:string;updatedAt:string;archivedAt?:string|null}
 export interface AgentMessage {id:number;threadId:number;role:"user"|"assistant"|"tool";content:string;status:string;cacheHit:number;createdAt?:string}
-

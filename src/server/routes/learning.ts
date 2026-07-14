@@ -26,11 +26,11 @@ export function createLearningRouter(repository: LearningRepository) {
     response.status(201).json(schedule);
   });
   router.post("/sessions/:id/complete", (request, response) => {
-    const session = repository.completeSession(Number(request.params.id));
+    const session = repository.completeSession(Number(request.params.id), (request as AuthenticatedRequest).auth?.id);
     if (!session) return response.status(409).json({ error: "Session cannot be completed" });
     return response.json(session);
   });
-  router.get("/dashboard", (_request, response) => response.json(repository.getDashboard(false)));
-  router.get("/progress", (_request, response) => response.json(repository.getProgress()));
+  router.get("/dashboard", (request, response) => response.json(repository.getDashboard(false, (request as AuthenticatedRequest).auth?.id)));
+  router.get("/progress", (request, response) => response.json(repository.getProgress((request as AuthenticatedRequest).auth?.id)));
   return router;
 }

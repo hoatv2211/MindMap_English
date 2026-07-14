@@ -153,10 +153,11 @@ data/
 
 ### Đóng gói lên VPS
 
-- Chạy sau reverse proxy HTTPS và đặt cấu hình production để cookie có `Secure`.
+- Chạy sau reverse proxy HTTPS. Đặt `HOST=0.0.0.0`, `ALLOW_REMOTE_BINDING=true`, `AUTH_SECURE_COOKIES=true`.
 - Không public trực tiếp SQLite, `DATA_DIR`, thư mục media hoặc backup. Chỉ user chạy service được quyền đọc/ghi `DATA_DIR`.
 - Giữ `NINEROUTER_KEY` trong biến môi trường phía server; không đưa vào bundle frontend.
-- Backup `DATA_DIR` trước migration hoặc deploy phiên bản mới.
+- Backup ZIP loại password hash, recovery hash, session token hash và AI cache. Khi restore, credential/session hiện tại được giữ từ DB đang chạy.
+- Backup vẫn chứa dữ liệu học của SQLite chung; bảo vệ thư mục backup như `DATA_DIR`, không public qua web server.
 
 ## License
 

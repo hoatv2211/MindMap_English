@@ -11,7 +11,7 @@ import { createApp } from "./app";
 
 loadProjectEnv();
 const config = loadConfig();
-if (!new Set(["127.0.0.1", "localhost", "::1"]).has(config.host)) throw new Error("Remote binding is disabled. Use HOST=127.0.0.1.");
+if (!config.allowRemoteBinding && !new Set(["127.0.0.1", "localhost", "::1"]).has(config.host)) throw new Error("Remote binding is disabled. Set ALLOW_REMOTE_BINDING=true only behind HTTPS reverse proxy.");
 fs.mkdirSync(config.dataDir, { recursive: true });
 applyPendingRestore(config);
 const db = createDatabase(config.databasePath);
@@ -32,4 +32,3 @@ const shutdown = () => {
 };
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
-

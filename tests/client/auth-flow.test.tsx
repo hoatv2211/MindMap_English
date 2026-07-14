@@ -1,10 +1,10 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider, useAuth } from "../../src/client/auth/auth-context";
 import { AuthPage } from "../../src/client/pages/AuthPage";
-import { api } from "../../src/client/api/client";
+import { api, AUTH_UNAUTHORIZED_EVENT } from "../../src/client/api/client";
 
 vi.mock("../../src/client/api/client", async (importOriginal) => {
   const original = await importOriginal<typeof import("../../src/client/api/client")>();
@@ -51,5 +51,11 @@ describe("account UX", () => {
     await user.click(await screen.findByText("Xin chào honghui"));
     await waitFor(() => expect(screen.getByRole("heading", { name: "Chào bạn quay lại." })).toBeInTheDocument());
   });
+  it("returns to login when session expires", async () => {
+    vi.mocked(api.authMe).mockResolvedValue({user:{id:3,username:"expired",profileRevision:1}});
+    render(<AuthProvider><Probe/></AuthProvider>);
+    expect(await screen.findByText("Xin chào expired")).toBeInTheDocument();
+    window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
+    expect(await screen.findByRole("heading",{name:"Chào bạn quay lại."})).toBeInTheDocument();
+  });
 });
-

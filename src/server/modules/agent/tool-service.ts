@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 import type { AppDatabase } from "../../db/database";
 import type { ContentRepository, SaveDraftInput } from "../content/repository";
 import type { LearningRepository } from "../learning/repository";
@@ -35,9 +35,9 @@ export class AgentToolService {
 
   getLearningProfile() { return this.learning.getProgress(); }
 
-  async generateMindmapDraft(input: MindmapDraftInput) {
+  async generateMindmapDraft(input: MindmapDraftInput, userId?: number) {
     const parsed = MindmapDraftInputSchema.parse(input);
-    const jobId = Number(this.db.prepare("INSERT INTO generation_jobs(job_type,status,request_json) VALUES ('mindmap','running',?)").run(JSON.stringify(parsed)).lastInsertRowid);
+    const jobId = Number(this.db.prepare("INSERT INTO generation_jobs(job_type,status,request_json,user_id) VALUES ('mindmap','running',?,?)").run(JSON.stringify(parsed), userId ?? null).lastInsertRowid);
     try {
       const generated = await this.client.chatJson(GeneratedMindmapSchema, [
         {
@@ -57,7 +57,7 @@ export class AgentToolService {
     }
   }
 
-  saveGeneratedDraft(topicId: number, generated: GeneratedMindmap) {
+  saveGeneratedDraft(topicId: number, generated: GeneratedMindmap, userId?: number) {
     const rootX = 0; const rootY = 0;
     const nodes: SaveDraftInput["nodes"] = [{ parentIndex: null, nodeType: "root", label: generated.title, meaningVi: generated.description, ipa: "", color: "amber", x: rootX, y: rootY, cefr: "B1" }];
     generated.branches.forEach((branch, branchIndex) => {
@@ -69,7 +69,7 @@ export class AgentToolService {
         nodes.push({ parentIndex: branchNodeIndex, nodeType: "vocabulary", label: word.term, term: word.term, meaningVi: word.meaningVi, ipa: word.ipa, cefr: word.cefr, color: branch.color, x: branchX + Math.cos(angle + (wordIndex - 1) * 0.32) * 190, y: branchY + Math.sin(angle + (wordIndex - 1) * 0.32) * 150 });
       });
     });
-    return this.content.saveMindmapDraft({ topicId, title: generated.title, description: generated.description, source: "ai", nodes });
+    return this.content.saveMindmapDraft({ topicId, title: generated.title, description: generated.description, source: "ai", nodes }, userId);
   }
 
   getChatRepository() { return new ChatRepository(this.db); }
@@ -82,13 +82,14 @@ export class AgentToolService {
     const context = new LearnerContextService(this.db).get(userId, skill.version);
     const previous = (chat.listMessages(userId, threadId) ?? []) as Array<{ role: "user" | "assistant" | "tool"; content: string }>;
     const responseCache = new AgentResponseCache(this.db);
+    const model=this.chatModel();
     const cacheEligible = isCacheEligibleQuestion(message, previous.filter(item => item.role === "user").length);
-    const cacheKey = responseCache.key({ userId, profileRevision: context.snapshot.profileRevision, skillVersion: skill.version, model: "", question: message });
+    const cacheKey = responseCache.key({ userId, profileRevision: context.snapshot.profileRevision, skillVersion: skill.version, model, question: message });
     chat.addMessage(userId, threadId, "user", message);
     if (cacheEligible) {
       const cached = responseCache.get(cacheKey, userId);
       if (cached) {
-        const saved = chat.addMessage(userId, threadId, "assistant", cached.responseText, { cacheHit: true, skillVersion: skill.version, profileRevision: context.snapshot.profileRevision });
+        const saved = chat.addMessage(userId, threadId, "assistant", cached.responseText, { cacheHit: true, model, skillVersion: skill.version, profileRevision: context.snapshot.profileRevision });
         return { message: saved, reply: cached.responseText, suggestions: ["Tạo ví dụ riêng của bạn"], contextCacheHit: context.cacheHit, responseCacheHit: true, skill: this.getTutorStatus() };
       }
     }
@@ -98,11 +99,37 @@ export class AgentToolService {
         { role: "system", content: `${skill.content}\n\nLearner snapshot (bounded local evidence):\n${JSON.stringify(context.snapshot)}` },
         ...history.filter(item => item.role !== "tool").map(item => ({ role: item.role as "user" | "assistant", content: item.content })),
       ]);
-      if (cacheEligible) responseCache.set(cacheKey, { userId, profileRevision: context.snapshot.profileRevision, skillVersion: skill.version, model: "", responseText: reply });
-      const saved = chat.addMessage(userId, threadId, "assistant", reply, { skillVersion: skill.version, profileRevision: context.snapshot.profileRevision });
+      if (cacheEligible) responseCache.set(cacheKey, { userId, profileRevision: context.snapshot.profileRevision, skillVersion: skill.version, model, responseText: reply });
+      const saved = chat.addMessage(userId, threadId, "assistant", reply, { model, skillVersion: skill.version, profileRevision: context.snapshot.profileRevision });
       return { message: saved, reply, suggestions: context.snapshot.unfinishedSession ? ["Tiếp tục bài đang dở"] : ["Ôn từ yếu hôm nay"], contextCacheHit: context.cacheHit, responseCacheHit: false, skill: this.getTutorStatus() };
     } catch (error) {
       chat.addMessage(userId, threadId, "assistant", error instanceof Error ? error.message : "Không thể gọi AI", { status: "failed", skillVersion: skill.version, profileRevision: context.snapshot.profileRevision });
+      throw error;
+    }
+  }
+
+  async retryTutorMessage(userId:number,threadId:number,messageId:number){
+    const chat=this.getChatRepository();
+    const target=chat.getMessage(userId,threadId,messageId) as {id:number;role:string;status:string;content:string}|null|undefined;
+    if(!target||target.role!=="assistant"||target.status!=="failed")return null;
+    const messages=(chat.listMessages(userId,threadId)??[]) as Array<{id:number;role:"user"|"assistant"|"tool";content:string;status:string}>;
+    const targetIndex=messages.findIndex(item=>item.id===messageId);
+    const userMessage=[...messages.slice(0,targetIndex)].reverse().find(item=>item.role==="user");
+    if(!userMessage)return null;
+    const skill=loadTutorSkill(this.projectRoot);
+    const context=new LearnerContextService(this.db).get(userId,skill.version);
+    const model=this.chatModel();
+    chat.updateMessage(userId,threadId,messageId,target.content,"retrying",{model,skillVersion:skill.version,profileRevision:context.snapshot.profileRevision});
+    const history=messages.slice(0,targetIndex).filter(item=>item.role!=="tool"&&item.status==="completed").slice(-12);
+    try{
+      const reply=await this.client.chatText([
+        {role:"system",content:`${skill.content}\n\nLearner snapshot (bounded local evidence):\n${JSON.stringify(context.snapshot)}`},
+        ...history.map(item=>({role:item.role as "user"|"assistant",content:item.content})),
+      ]);
+      const saved=chat.updateMessage(userId,threadId,messageId,reply,"completed",{model,skillVersion:skill.version,profileRevision:context.snapshot.profileRevision});
+      return{message:saved,reply,suggestions:["Thử viết một ví dụ của bạn"],contextCacheHit:context.cacheHit,responseCacheHit:false,skill:this.getTutorStatus()};
+    }catch(error){
+      chat.updateMessage(userId,threadId,messageId,error instanceof Error?error.message:"Không thể gọi AI","failed",{model,skillVersion:skill.version,profileRevision:context.snapshot.profileRevision});
       throw error;
     }
   }
@@ -115,9 +142,9 @@ export class AgentToolService {
     return { reply, suggestions: [] };
   }
 
-  async generateDocumentExtractionDraft(documentId: number, sectionIds: number[], text: string) {
+  async generateDocumentExtractionDraft(documentId: number, sectionIds: number[], text: string, userId?: number) {
     const request = { documentId, sectionIds };
-    const jobId = Number(this.db.prepare("INSERT INTO generation_jobs(job_type,status,request_json) VALUES ('document-extraction','running',?)").run(JSON.stringify(request)).lastInsertRowid);
+    const jobId = Number(this.db.prepare("INSERT INTO generation_jobs(job_type,status,request_json,user_id) VALUES ('document-extraction','running',?,?)").run(JSON.stringify(request), userId ?? null).lastInsertRowid);
     try {
       const draft = await this.client.chatJson(DocumentExtractionSchema, [
         { role: "system", content: "Extract practical English learning candidates for a Vietnamese learner. Return JSON only. Do not invent quotations. Categorize each item as recommended, optional, or skip and provide one short reason." },
@@ -131,6 +158,8 @@ export class AgentToolService {
     }
   }
 
+  private chatModel(){const client=this.client as unknown as {getChatModel?:()=>string};return client.getChatModel?.()??""}
+
   private findDuplicates(generated: GeneratedMindmap) {
     const terms = generated.branches.flatMap((branch) => branch.words.map((word) => word.term.toLowerCase()));
     if (!terms.length) return [];
@@ -138,9 +167,3 @@ export class AgentToolService {
     return (this.db.prepare(`SELECT term,meaning_vi meaningVi FROM vocabulary WHERE normalized_term IN (${placeholders})`).all(...terms) as Array<{ term: string; meaningVi: string }>);
   }
 }
-
-
-
-
-
-

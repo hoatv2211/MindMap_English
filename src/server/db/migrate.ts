@@ -1,4 +1,4 @@
-﻿import type { AppDatabase } from "./database";
+import type { AppDatabase } from "./database";
 
 const migrationSql = `
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -332,6 +332,14 @@ CREATE TABLE IF NOT EXISTS auth_rate_limits (
   window_started_at TEXT NOT NULL,
   blocked_until TEXT
 );
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(user_id,key)
+);
+
 CREATE TABLE IF NOT EXISTS user_learning_progress (
   user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   xp INTEGER NOT NULL DEFAULT 0,
@@ -374,6 +382,35 @@ function ensureColumn(db: AppDatabase, table: string, column: string, definition
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   if (!columns.some((item) => item.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
+function createProfileRevisionTriggers(db: AppDatabase): void {
+  const tables = [
+    "mindmaps", "learning_sessions", "review_attempts", "sentence_notebook",
+    "speaking_sessions", "speaking_attempts", "document_sources", "document_highlights",
+    "user_learning_progress", "user_vocabulary_state",
+  ];
+  for (const table of tables) {
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS trg_${table}_profile_insert
+      AFTER INSERT ON ${table}
+      WHEN NEW.user_id IS NOT NULL
+      BEGIN
+        UPDATE users SET profile_revision=profile_revision+1,updated_at=CURRENT_TIMESTAMP WHERE id=NEW.user_id;
+      END;
+      CREATE TRIGGER IF NOT EXISTS trg_${table}_profile_update
+      AFTER UPDATE ON ${table}
+      WHEN NEW.user_id IS NOT NULL
+      BEGIN
+        UPDATE users SET profile_revision=profile_revision+1,updated_at=CURRENT_TIMESTAMP WHERE id=NEW.user_id;
+      END;
+      CREATE TRIGGER IF NOT EXISTS trg_${table}_profile_delete
+      AFTER DELETE ON ${table}
+      WHEN OLD.user_id IS NOT NULL
+      BEGIN
+        UPDATE users SET profile_revision=profile_revision+1,updated_at=CURRENT_TIMESTAMP WHERE id=OLD.user_id;
+      END;
+    `);
+  }
+}
 export function migrate(db: AppDatabase): void {
   db.exec(migrationSql);
   db.exec(authMigrationSql);
@@ -393,8 +430,14 @@ export function migrate(db: AppDatabase): void {
   ensureColumn(db, "agent_messages", "cache_hit", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "agent_messages", "skill_version", "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, "agent_messages", "profile_revision", "INTEGER");
+  ensureColumn(db, "user_vocabulary_state", "stability", "REAL NOT NULL DEFAULT 1");
+  ensureColumn(db, "user_vocabulary_state", "difficulty", "REAL NOT NULL DEFAULT 5");
+  ensureColumn(db, "user_vocabulary_state", "interval_days", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "user_vocabulary_state", "repetitions", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "user_vocabulary_state", "lapses", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "user_vocabulary_state", "due_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP");
+  ensureColumn(db, "user_vocabulary_state", "last_reviewed_at", "TEXT");
+  createProfileRevisionTriggers(db);
   db.prepare("INSERT OR IGNORE INTO schema_migrations(version) VALUES (1)").run();
   db.prepare("INSERT OR IGNORE INTO user_progress(id) VALUES (1)").run();
 }
-
-

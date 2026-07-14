@@ -1,4 +1,4 @@
-﻿import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AppDatabase } from "../../src/server/db/database";
 import { createDatabase } from "../../src/server/db/database";
 import { migrate } from "../../src/server/db/migrate";
@@ -24,7 +24,7 @@ describe("database migration", () => {
       "sentence_notebook", "speaking_sessions", "speaking_session_items",
       "speaking_attempts", "document_sources", "document_sections",
       "document_highlights", "users", "auth_sessions", "password_recovery_codes",
-      "auth_rate_limits", "learner_context_cache", "agent_response_cache",
+      "auth_rate_limits", "user_settings", "learner_context_cache", "agent_response_cache",
     ]));
     expect(db.pragma("foreign_keys", { simple: true })).toBe(1);
   });
@@ -39,6 +39,16 @@ describe("database migration", () => {
     expect(mapCount).toBe(1);
     expect(wordCount).toBeGreaterThanOrEqual(18);
   });
+  it("adds per-user SRS columns and idempotent profile triggers", () => {
+    migrate(db);
+    const columns=(db.prepare("PRAGMA table_info(user_vocabulary_state)").all() as Array<{name:string}>).map(row=>row.name);
+    expect(columns).toEqual(expect.arrayContaining(["stability","difficulty","interval_days","repetitions","lapses","due_at","last_reviewed_at"]));
+    const triggerCount=(db.prepare("SELECT COUNT(*) count FROM sqlite_master WHERE type='trigger' AND name LIKE 'trg_%_profile_%'").get() as {count:number}).count;
+    expect(triggerCount).toBeGreaterThan(10);
+    db.prepare("INSERT INTO users(username,normalized_username,password_hash) VALUES ('revision','revision','hash')").run();
+    const before=(db.prepare("SELECT profile_revision value FROM users WHERE id=1").get() as {value:number}).value;
+    db.prepare("INSERT INTO user_learning_progress(user_id) VALUES (1)").run();
+    const after=(db.prepare("SELECT profile_revision value FROM users WHERE id=1").get() as {value:number}).value;
+    expect(after).toBeGreaterThan(before);
+  });
 });
-
-

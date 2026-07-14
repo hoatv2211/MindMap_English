@@ -10,7 +10,8 @@ export class DocumentRepository {
   constructor(private readonly db: AppDatabase, private readonly config: AppConfig) {}
 
   create(input: { title: string; originalFilename: string; format: "txt" | "md" | "epub"; mimeType: string; buffer: Buffer }, userId?: number) {
-    const checksum = createHash("sha256").update(input.buffer).digest("hex");
+    const contentChecksum = createHash("sha256").update(input.buffer).digest("hex");
+    const checksum = userId === undefined ? contentChecksum : createHash("sha256").update(`${userId}:${contentChecksum}`).digest("hex");
     if (this.db.prepare(`SELECT id FROM document_sources WHERE checksum=? ${userId === undefined ? "" : "AND user_id=?"}`).get(...(userId === undefined ? [checksum] : [checksum, userId]))) return null;
     const sections = input.format === "epub" ? parseEpub(input.buffer) : parseDocument(input.format, input.buffer.toString("utf8"));
     const relativePath = path.join("documents", checksum, `source.${input.format}`);
@@ -50,7 +51,7 @@ export class DocumentRepository {
     const section = this.db.prepare("SELECT id,content,fingerprint FROM document_sections WHERE id=? AND document_id=?").get(input.sectionId, documentId) as { id: number; content: string; fingerprint: string } | undefined;
     if (!section || section.content.slice(input.startOffset, input.endOffset) !== input.selectedText) return null;
     if (input.vocabularyId && !this.db.prepare("SELECT id FROM vocabulary WHERE id=?").get(input.vocabularyId)) return null;
-    if (input.sentenceId && !this.db.prepare("SELECT id FROM sentence_notebook WHERE id=?").get(input.sentenceId)) return null;
+    if (input.sentenceId && !(userId === undefined ? this.db.prepare("SELECT id FROM sentence_notebook WHERE id=?").get(input.sentenceId) : this.db.prepare("SELECT id FROM sentence_notebook WHERE id=? AND user_id=?").get(input.sentenceId,userId))) return null;
     const textFingerprint = createHash("sha256").update(`${section.fingerprint}:${input.startOffset}:${input.endOffset}:${input.selectedText}`).digest("hex");
     const id = Number(this.db.prepare(`INSERT INTO document_highlights(document_id,section_id,vocabulary_id,sentence_id,selected_text,start_offset,end_offset,source_type,text_fingerprint,user_id)
       VALUES (?,?,?,?,?,?,?,'quoted',?,?)`).run(documentId, section.id, input.vocabularyId ?? null, input.sentenceId ?? null, input.selectedText, input.startOffset, input.endOffset, textFingerprint, userId ?? null).lastInsertRowid);
@@ -70,6 +71,7 @@ export class DocumentRepository {
       const vocabulary = this.db.prepare(`SELECT id,term,normalized_term normalizedTerm,ipa,part_of_speech partOfSpeech,meaning_vi meaningVi,cefr,status,image_url imageUrl,audio_url audioUrl FROM vocabulary WHERE normalized_term=?`).get(normalizedTerm) as { id: number } & Record<string, unknown>;
       if (input.meaningVi.trim()) this.db.prepare("UPDATE vocabulary SET meaning_vi=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(input.meaningVi.trim(), vocabulary.id);
       this.db.prepare("INSERT OR IGNORE INTO review_cards(vocabulary_id) VALUES (?)").run(vocabulary.id);
+      if (userId !== undefined) this.db.prepare("INSERT OR IGNORE INTO user_vocabulary_state(user_id,vocabulary_id,status) VALUES (?,?,'new')").run(userId,vocabulary.id);
       const highlight = this.addHighlight(documentId, { ...input, vocabularyId: vocabulary.id }, userId);
       return { vocabulary: this.db.prepare(`SELECT id,term,normalized_term normalizedTerm,ipa,part_of_speech partOfSpeech,meaning_vi meaningVi,cefr,status,image_url imageUrl,audio_url audioUrl FROM vocabulary WHERE id=?`).get(vocabulary.id), highlight };
     });

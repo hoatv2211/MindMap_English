@@ -1,5 +1,5 @@
-﻿import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
-import { api, type AuthUser } from "../api/client";
+import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
+import { api, AUTH_UNAUTHORIZED_EVENT, type AuthUser } from "../api/client";
 
 type AuthState = {status:"loading"}|{status:"anonymous"}|{status:"recovery-checkpoint";user:AuthUser;recoveryCode:string}|{status:"authenticated";user:AuthUser};
 type AuthContextValue = AuthState & {
@@ -12,7 +12,7 @@ type AuthContextValue = AuthState & {
 const Context=createContext<AuthContextValue|null>(null);
 export function AuthProvider({children}:PropsWithChildren){
   const [state,setState]=useState<AuthState>({status:"loading"});
-  useEffect(()=>{let active=true;api.authMe().then(({user})=>active&&setState({status:"authenticated",user})).catch(()=>active&&setState({status:"anonymous"}));return()=>{active=false}},[]);
+  useEffect(()=>{let active=true;const unauthorized=()=>setState({status:"anonymous"});window.addEventListener(AUTH_UNAUTHORIZED_EVENT,unauthorized);api.authMe().then(({user})=>active&&setState({status:"authenticated",user})).catch(()=>active&&setState({status:"anonymous"}));return()=>{active=false;window.removeEventListener(AUTH_UNAUTHORIZED_EVENT,unauthorized)}},[]);
   const value=useMemo<AuthContextValue>(()=>({...state,
     login:async(input)=>{const result=await api.login(input);setState({status:"authenticated",user:result.user})},
     register:async(input)=>{const result=await api.register(input);setState({status:"recovery-checkpoint",user:result.user,recoveryCode:result.recoveryCode})},
@@ -23,4 +23,3 @@ export function AuthProvider({children}:PropsWithChildren){
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 export function useAuth(){const value=useContext(Context);if(!value)throw new Error("AuthProvider missing");return value}
-

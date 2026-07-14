@@ -22,4 +22,17 @@ describe("settings API", () => {
     expect(JSON.stringify(response.body)).not.toContain("top-secret");
     expect(JSON.stringify(response.body)).not.toContain("leak");
   });
+  it("isolates preferences between authenticated users", async () => {
+    const config=loadConfig();
+    const protectedApp=createApp({db,config,nineRouter:{health:vi.fn(async()=>false)} as never,protectApi:true});
+    const first=request.agent(protectedApp);
+    const second=request.agent(protectedApp);
+    await first.post("/api/auth/register").send({username:"settings-one",password:"strong password 123",passwordConfirmation:"strong password 123"}).expect(201);
+    await second.post("/api/auth/register").send({username:"settings-two",password:"strong password 123",passwordConfirmation:"strong password 123"}).expect(201);
+    await first.put("/api/settings").send({defaultDuration:10,weeklyGoalMinutes:80}).expect(200);
+    await second.put("/api/settings").send({defaultDuration:20,weeklyGoalMinutes:140}).expect(200);
+    expect((await first.get("/api/settings").expect(200)).body).toMatchObject({defaultDuration:10,weeklyGoalMinutes:80});
+    expect((await second.get("/api/settings").expect(200)).body).toMatchObject({defaultDuration:20,weeklyGoalMinutes:140});
+  });
+
 });

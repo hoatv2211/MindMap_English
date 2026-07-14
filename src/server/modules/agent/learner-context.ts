@@ -1,6 +1,6 @@
-﻿import type { AppDatabase } from "../../db/database";
+import type { AppDatabase } from "../../db/database";
 const SCHEMA_VERSION="1";
-export interface LearnerSnapshot{profileRevision:number;progress:{xp:number;streak:number;weeklyGoalMinutes:number};vocabulary:{total:number;weak:number;due:number;items:Array<{term:string;meaningVi:string;status:string}>};recentMistakes:Array<{term:string;answer:string}>;unfinishedSession:{id:number;durationMinutes:number}|null;recentSentences:string[];recentDocuments:string[]}
+export interface LearnerSnapshot{profileRevision:number;progress:{xp:number;streak:number;weeklyGoalMinutes:number};vocabulary:{total:number;weak:number;due:number;items:Array<{term:string;meaningVi:string;status:string}>};recentMistakes:Array<{term:string;answer:string}>;recentSpeaking:Array<{targetText:string;transcript:string;contentScore:number}>;unfinishedSession:{id:number;durationMinutes:number}|null;recentSentences:string[];recentDocuments:string[]}
 export class LearnerContextService{
   constructor(private readonly db:AppDatabase){}
   get(userId:number,skillVersion:string):{snapshot:LearnerSnapshot;cacheHit:boolean}{
@@ -12,10 +12,11 @@ export class LearnerContextService{
     const due=counts.weak ?? 0;
     const items=this.db.prepare(`SELECT v.term,v.meaning_vi meaningVi,s.status FROM user_vocabulary_state s JOIN vocabulary v ON v.id=s.vocabulary_id WHERE s.user_id=? AND s.status IN ('weak','learning') ORDER BY CASE s.status WHEN 'weak' THEN 0 ELSE 1 END,s.updated_at DESC LIMIT 8`).all(userId) as Array<{term:string;meaningVi:string;status:string}>;
     const recentMistakes=this.db.prepare(`SELECT v.term,a.answer FROM review_attempts a JOIN vocabulary v ON v.id=a.vocabulary_id WHERE a.is_correct=0 AND a.user_id=? ORDER BY a.id DESC LIMIT 6`).all(userId) as Array<{term:string;answer:string}>;
+    const recentSpeaking=this.db.prepare("SELECT target_text targetText,transcript,content_score contentScore FROM speaking_attempts WHERE user_id=? ORDER BY id DESC LIMIT 3").all(userId) as Array<{targetText:string;transcript:string;contentScore:number}>;
     const unfinished=this.db.prepare("SELECT id,duration_minutes durationMinutes FROM learning_sessions WHERE status='active' AND user_id=? ORDER BY id DESC LIMIT 1").get(userId) as {id:number;durationMinutes:number}|undefined;
     const recentSentences=(this.db.prepare("SELECT sentence FROM sentence_notebook WHERE user_id=? ORDER BY id DESC LIMIT 5").all(userId) as Array<{sentence:string}>).map(row=>row.sentence.slice(0,240));
     const recentDocuments=(this.db.prepare("SELECT title FROM document_sources WHERE user_id=? ORDER BY id DESC LIMIT 4").all(userId) as Array<{title:string}>).map(row=>row.title.slice(0,120));
-    const snapshot:LearnerSnapshot={profileRevision:user.profileRevision,progress,vocabulary:{total:counts.total,weak:counts.weak??0,due,items},recentMistakes,unfinishedSession:unfinished??null,recentSentences,recentDocuments};
+    const snapshot:LearnerSnapshot={profileRevision:user.profileRevision,progress,vocabulary:{total:counts.total,weak:counts.weak??0,due,items},recentMistakes,recentSpeaking,unfinishedSession:unfinished??null,recentSentences,recentDocuments};
     this.db.prepare("INSERT OR REPLACE INTO learner_context_cache(user_id,profile_revision,skill_version,schema_version,snapshot_json) VALUES (?,?,?,?,?)").run(userId,user.profileRevision,skillVersion,SCHEMA_VERSION,JSON.stringify(snapshot));
     return{snapshot,cacheHit:false};
   }

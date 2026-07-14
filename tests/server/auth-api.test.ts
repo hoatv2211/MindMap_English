@@ -1,4 +1,4 @@
-﻿import request from "supertest";
+import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AppDatabase } from "../../src/server/db/database";
 import { createDatabase } from "../../src/server/db/database";
@@ -12,7 +12,7 @@ afterEach(() => db.close());
 
 function app() {
   return createApp({ db, config: {
-    host: "127.0.0.1", port: 8787, dataDir: ".", databasePath: ":memory:", mediaDir: ".", backupDir: ".",
+    host: "127.0.0.1", allowRemoteBinding:false, port: 8787, dataDir: ".", databasePath: ":memory:", mediaDir: ".", backupDir: ".",
     auth: { secureCookies: false, sessionHours: 24, absoluteSessionHours: 168 },
     nineRouter: { url: "http://localhost:20128", key: "", chatModel: "", imageModel: "", sttModel: "", ttsModel: "", ttsVoice: "" },
   }, nineRouter: { health: async () => false } as never });
@@ -28,6 +28,7 @@ describe("auth API", () => {
     expect(registered.body.recoveryCode).toMatch(/^[A-Z0-9-]{20,}$/);
     expect(registered.headers["set-cookie"][0]).toContain("HttpOnly");
     expect(registered.headers["set-cookie"][0]).toContain("SameSite=Lax");
+    expect(registered.headers["set-cookie"][0]).toContain("Max-Age=604800");
 
     const me = await agent.get("/api/auth/me");
     expect(me.status).toBe(200);
@@ -66,7 +67,7 @@ describe("auth API", () => {
     expect(missing.body).toEqual(wrong.body);
   });
   it("protects application APIs when production gate is enabled", async () => {
-    const protectedApp=createApp({db,config:{host:"127.0.0.1",port:8787,dataDir:".",databasePath:":memory:",mediaDir:".",backupDir:".",auth:{secureCookies:false,sessionHours:24,absoluteSessionHours:168},nineRouter:{url:"http://localhost:20128",key:"",chatModel:"",imageModel:"",sttModel:"",ttsModel:"",ttsVoice:""}},nineRouter:{health:async()=>false} as never,protectApi:true});
+    const protectedApp=createApp({db,config:{host:"127.0.0.1",allowRemoteBinding:false,port:8787,dataDir:".",databasePath:":memory:",mediaDir:".",backupDir:".",auth:{secureCookies:false,sessionHours:24,absoluteSessionHours:168},nineRouter:{url:"http://localhost:20128",key:"",chatModel:"",imageModel:"",sttModel:"",ttsModel:"",ttsVoice:""}},nineRouter:{health:async()=>false} as never,protectApi:true});
     expect((await request(protectedApp).get("/api/learning/dashboard")).status).toBe(401);
     expect((await request(protectedApp).get("/api/health")).status).toBe(200);
   });
@@ -89,4 +90,16 @@ describe("auth API", () => {
     expect((await request(protectedApp).post("/api/auth/password/recover").send({username:"missing-recovery",recoveryCode:"WRONG-CODE",password:"new password 456",passwordConfirmation:"new password 456"})).status).toBe(429);
   });
 
+  it("rate-limits registration and username rotation by client address", async () => {
+    const target=app();
+    await request(target).post("/api/auth/register").send({username:"register-limit",password:"strong password 123",passwordConfirmation:"strong password 123"}).expect(201);
+    for(let attempt=0;attempt<19;attempt++) await request(target).post("/api/auth/register").send({username:"register-limit",password:"strong password 123",passwordConfirmation:"strong password 123"});
+    await request(target).post("/api/auth/register").send({username:"another-name",password:"strong password 123",passwordConfirmation:"strong password 123"}).expect(429);
+  });
+
+  it("rate-limits login failures across rotated usernames", async () => {
+    const target=app();
+    for(let attempt=0;attempt<5;attempt++) await request(target).post("/api/auth/login").send({username:`missing-${attempt}`,password:"wrong password 123"}).expect(401);
+    await request(target).post("/api/auth/login").send({username:"missing-six",password:"wrong password 123"}).expect(429);
+  });
 });

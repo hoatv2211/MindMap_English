@@ -18,7 +18,7 @@ export class SpeakingRepository {
   }
 
   addSentence(input: { sentence: string; translationVi?: string; sourceType: "quoted" | "user" | "ai"; sourceReference?: string; vocabularyId?: number | null; exampleId?: number | null }, userId?: number) {
-    const fingerprint = fingerprintSentence(input.sentence);
+    const fingerprint = fingerprintSentence(userId === undefined ? input.sentence : `${userId}:${input.sentence}`);
     const existing = this.db.prepare(`SELECT id FROM sentence_notebook WHERE fingerprint = ? ${userId === undefined ? "" : "AND user_id=?"}`).get(...(userId === undefined ? [fingerprint] : [fingerprint, userId]));
     if (existing) return null;
     const id = Number(this.db.prepare(`INSERT INTO sentence_notebook(vocabulary_id,example_id,sentence,translation_vi,source_type,source_reference,fingerprint,user_id)
@@ -29,6 +29,11 @@ export class SpeakingRepository {
   }
 
   createSession(sentenceIds: number[], userId?: number) {
+    if (userId !== undefined) {
+      const placeholders=sentenceIds.map(()=>"?").join(",");
+      const owned=(this.db.prepare(`SELECT COUNT(*) count FROM sentence_notebook WHERE user_id=? AND id IN (${placeholders})`).get(userId,...sentenceIds) as {count:number}).count;
+      if (owned !== sentenceIds.length) return null;
+    }
     return withTransaction(this.db, () => {
       const sessionId = Number(this.db.prepare("INSERT INTO speaking_sessions(status,user_id) VALUES ('active',?)").run(userId ?? null).lastInsertRowid);
       const insert = this.db.prepare("INSERT INTO speaking_session_items(session_id,sentence_id,sort_order) VALUES (?,?,?)");

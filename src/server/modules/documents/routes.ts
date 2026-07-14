@@ -40,7 +40,7 @@ export function createDocumentRouter(repository: DocumentRepository, agent: Agen
       const { sectionIds } = z.object({ sectionIds: z.array(z.number().int().positive()).min(1).max(20) }).parse(request.body);
       const text = repository.getSectionText(Number(request.params.id), sectionIds, (request as AuthenticatedRequest).auth?.id);
       if (!text) return response.status(404).json({ error: "Document sections not found" });
-      return response.status(201).json(await agent.generateDocumentExtractionDraft(Number(request.params.id), sectionIds, text));
+      return response.status(201).json(await agent.generateDocumentExtractionDraft(Number(request.params.id), sectionIds, text, (request as AuthenticatedRequest).auth?.id));
     } catch (error) { next(error); }
   });
   return router;

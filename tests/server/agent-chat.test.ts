@@ -1,4 +1,4 @@
-﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppDatabase } from "../../src/server/db/database";
 import { createDatabase } from "../../src/server/db/database";
 import { migrate } from "../../src/server/db/migrate";
@@ -29,7 +29,7 @@ describe("persistent tutor chat",()=>{
     const first=service.get(id,"1.0.0");const second=service.get(id,"1.0.0");
     expect(first.snapshot.vocabulary.weak).toBe(1);
     expect(second.cacheHit).toBe(true);
-    db.prepare("UPDATE users SET profile_revision=profile_revision+1 WHERE id=?").run(id);
+    db.prepare("UPDATE user_vocabulary_state SET status='learning',updated_at=CURRENT_TIMESTAMP WHERE user_id=? AND vocabulary_id=?").run(id,vocabularyId);
     expect(service.get(id,"1.0.0").cacheHit).toBe(false);
     expect(JSON.stringify(first.snapshot)).not.toContain("password_hash");
   });

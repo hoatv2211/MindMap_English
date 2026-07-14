@@ -1,4 +1,4 @@
-﻿import express, { type ErrorRequestHandler } from "express";
+import express, { type ErrorRequestHandler } from "express";
 import { ZodError } from "zod";
 import type { AppDatabase } from "./db/database";
 import { loadConfig, type AppConfig } from "./config";
@@ -43,10 +43,11 @@ export function createApp({ db, config = loadConfig(), nineRouter, includeNotFou
   const auth = new AuthService(db, config.auth.sessionHours, config.auth.absoluteSessionHours);
 
   app.disable("x-powered-by");
+  app.set("trust proxy", "loopback");
   app.use(express.json({ limit: "1mb" }));
   app.use(optionalAuth(auth));
   app.use("/api", requireSameOrigin);
-  app.use("/api/auth", createAuthRouter(auth, config.auth.secureCookies));
+  app.use("/api/auth", createAuthRouter(auth, config.auth.secureCookies, config.auth.absoluteSessionHours));
   app.get("/api/health", async (_request, response) => response.json({ ok: true, aiOnline: await client.health(), ...agent.getTutorStatus() }));
   if (protectApi) app.use("/api", requireAuth);
   app.use("/api", createLibraryRouter(content));
@@ -70,5 +71,3 @@ export function createApp({ db, config = loadConfig(), nineRouter, includeNotFou
   app.use(errorHandler);
   return app;
 }
-
-

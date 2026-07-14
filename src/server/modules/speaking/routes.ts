@@ -18,7 +18,8 @@ export function createSpeakingRouter(repository: SpeakingRepository) {
   });
   router.post("/sessions", (request, response) => {
     const { sentenceIds } = z.object({ sentenceIds: z.array(z.number().int().positive()).min(1).max(50) }).parse(request.body);
-    return response.status(201).json(repository.createSession(sentenceIds, (request as AuthenticatedRequest).auth?.id));
+    const session=repository.createSession(sentenceIds, (request as AuthenticatedRequest).auth?.id);
+    return session ? response.status(201).json(session) : response.status(404).json({error:"Sentence not found"});
   });
   router.get("/sessions/:id", (request, response) => {
     const session = repository.getSession(Number(request.params.id), (request as AuthenticatedRequest).auth?.id);
