@@ -13,16 +13,19 @@ afterEach(() => db.close());
 
 describe("AgentToolService", () => {
   it("creates an AI result as an unapproved draft", async () => {
+    db.prepare("INSERT INTO users(username,normalized_username,password_hash) VALUES ('owner','owner','hash')").run();
     const client = { chatJson: vi.fn(async () => ({ title: "Breakfast talk", description: "Useful breakfast language", branches: [
-      { label: "drinks", meaningVi: "đồ uống", color: "sky", words: [{ term: "black coffee", meaningVi: "cà phê đen", ipa: "/blæk ˈkɒf.i/", cefr: "B1", example: "I take my coffee black.", exampleVi: "Tôi uống cà phê đen." }, { term: "refill", meaningVi: "châm thêm", ipa: "/ˌriːˈfɪl/", cefr: "B1", example: "Could I get a refill?", exampleVi: "Cho tôi châm thêm được không?" }] },
-      { label: "orders", meaningVi: "gọi món", color: "coral", words: [{ term: "on the side", meaningVi: "để riêng", ipa: "", cefr: "B1", example: "Sauce on the side, please.", exampleVi: "Cho sốt để riêng." }, { term: "to go", meaningVi: "mang đi", ipa: "", cefr: "A2", example: "Can I get this to go?", exampleVi: "Cho tôi mang đi được không?" }] },
-      { label: "food", meaningVi: "món ăn", color: "amber", words: [{ term: "scrambled eggs", meaningVi: "trứng bác", ipa: "", cefr: "A2", example: "I'll have scrambled eggs.", exampleVi: "Tôi dùng trứng bác." }, { term: "toast", meaningVi: "bánh mì nướng", ipa: "", cefr: "A2", example: "Two slices of toast, please.", exampleVi: "Cho hai lát bánh mì nướng." }] },
+      { label: "drinks", meaningVi: "Ä‘á»“ uá»‘ng", color: "sky", words: [{ term: "black coffee", meaningVi: "cÃ  phÃª Ä‘en", ipa: "/blÃ¦k ËˆkÉ’f.i/", cefr: "B1", example: "I take my coffee black.", exampleVi: "TÃ´i uá»‘ng cÃ  phÃª Ä‘en." }, { term: "refill", meaningVi: "chÃ¢m thÃªm", ipa: "/ËŒriËËˆfÉªl/", cefr: "B1", example: "Could I get a refill?", exampleVi: "Cho tÃ´i chÃ¢m thÃªm Ä‘Æ°á»£c khÃ´ng?" }] },
+      { label: "orders", meaningVi: "gá»i mÃ³n", color: "coral", words: [{ term: "on the side", meaningVi: "Ä‘á»ƒ riÃªng", ipa: "", cefr: "B1", example: "Sauce on the side, please.", exampleVi: "Cho sá»‘t Ä‘á»ƒ riÃªng." }, { term: "to go", meaningVi: "mang Ä‘i", ipa: "", cefr: "A2", example: "Can I get this to go?", exampleVi: "Cho tÃ´i mang Ä‘i Ä‘Æ°á»£c khÃ´ng?" }] },
+      { label: "food", meaningVi: "mÃ³n Äƒn", color: "amber", words: [{ term: "scrambled eggs", meaningVi: "trá»©ng bÃ¡c", ipa: "", cefr: "A2", example: "I'll have scrambled eggs.", exampleVi: "TÃ´i dÃ¹ng trá»©ng bÃ¡c." }, { term: "toast", meaningVi: "bÃ¡nh mÃ¬ nÆ°á»›ng", ipa: "", cefr: "A2", example: "Two slices of toast, please.", exampleVi: "Cho hai lÃ¡t bÃ¡nh mÃ¬ nÆ°á»›ng." }] },
     ] })) };
     const service = new AgentToolService(db, new ContentRepository(db), new LearningRepository(db), client as never);
-    const generated = await service.generateMindmapDraft({ topic: "breakfast", situation: "cafe", cefr: "B1" });
-    const saved = service.saveGeneratedDraft(1, generated.draft);
+    const generated = await service.generateMindmapDraft({ topic: "breakfast", situation: "cafe", cefr: "B1" }, 1);
+    const saved = service.saveGeneratedDraft(1, generated.draft, 1);
     expect(saved.status).toBe("draft");
-    expect(new ContentRepository(db).listMindmaps("approved")).toHaveLength(1);
+    expect(new ContentRepository(db).listMindmaps("approved", 1)).toHaveLength(1);
+    expect((db.prepare("SELECT user_id userId FROM generation_jobs WHERE id=?").get(generated.jobId) as {userId:number}).userId).toBe(1);
+    expect((db.prepare("SELECT user_id userId FROM mindmaps WHERE id=?").get(saved.id) as {userId:number}).userId).toBe(1);
   });
 
   it("records failed generation without mutating mindmaps", async () => {

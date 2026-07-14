@@ -33,5 +33,9 @@ describe("loadProjectEnv", () => {
   });
   it("does nothing when .env is missing", () => {
     expect(loadProjectEnv(path.join(os.tmpdir(), "missing-mindmap.env"))).toBe(false);
+  });  it("parses explicit boolean security flags", () => {
+    expect(loadConfig({AUTH_SECURE_COOKIES:"false",ALLOW_REMOTE_BINDING:"false"}).auth.secureCookies).toBe(false);
+    const remote=loadConfig({AUTH_SECURE_COOKIES:"true",ALLOW_REMOTE_BINDING:"true"});
+    expect(remote.auth.secureCookies).toBe(true);expect(remote.allowRemoteBinding).toBe(true);
   });
 });

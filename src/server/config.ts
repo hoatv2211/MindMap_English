@@ -1,6 +1,8 @@
 import path from "node:path";
 import { z } from "zod";
 
+const BooleanValue=z.preprocess(value=>typeof value==="string"?["1","true","yes","on"].includes(value.toLowerCase()):value,z.boolean());
+
 const EnvSchema = z.object({
   HOST: z.string().default("127.0.0.1"),
   PORT: z.coerce.number().int().positive().default(8787),
@@ -12,6 +14,10 @@ const EnvSchema = z.object({
   NINEROUTER_STT_MODEL: z.string().default(""),
   NINEROUTER_TTS_MODEL: z.string().default(""),
   NINEROUTER_TTS_VOICE: z.string().default(""),
+  ALLOW_REMOTE_BINDING: BooleanValue.default(false),
+  AUTH_SECURE_COOKIES: BooleanValue.default(false),
+  AUTH_SESSION_HOURS: z.coerce.number().positive().default(24),
+  AUTH_ABSOLUTE_SESSION_HOURS: z.coerce.number().positive().default(168),
 });
 
 export type AppConfig = ReturnType<typeof loadConfig>;
@@ -21,11 +27,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   const dataDir = path.resolve(parsed.DATA_DIR);
   return {
     host: parsed.HOST,
+    allowRemoteBinding: parsed.ALLOW_REMOTE_BINDING,
     port: parsed.PORT,
     dataDir,
     databasePath: path.join(dataDir, "mindmap-english.db"),
     mediaDir: path.join(dataDir, "media"),
     backupDir: path.join(dataDir, "backups"),
+    auth: { secureCookies: parsed.AUTH_SECURE_COOKIES, sessionHours: parsed.AUTH_SESSION_HOURS, absoluteSessionHours: parsed.AUTH_ABSOLUTE_SESSION_HOURS },
     nineRouter: {
       url: parsed.NINEROUTER_URL.replace(/\/v1\/?$/, "").replace(/\/$/, ""),
       key: parsed.NINEROUTER_KEY,

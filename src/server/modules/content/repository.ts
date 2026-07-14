@@ -56,35 +56,41 @@ interface NodeRow {
 export class ContentRepository {
   constructor(private readonly db: AppDatabase) {}
 
-  listTopics() {
+  listTopics(userId?: number) {
+    const ownerCount=userId===undefined?"1=1":"(m.source='seed' OR m.user_id=?)";
     return (this.db.prepare(`
-      SELECT t.*, COUNT(CASE WHEN m.status='approved' THEN 1 END) mindmap_count
+      SELECT t.*, COUNT(CASE WHEN m.status='approved' AND ${ownerCount} THEN 1 END) mindmap_count
       FROM topics t LEFT JOIN mindmaps m ON m.topic_id=t.id
       GROUP BY t.id ORDER BY t.sort_order, t.id
-    `).all() as Array<TopicRow & { mindmap_count: number }>).map((row) => ({
+    `).all(...(userId===undefined?[]:[userId])) as Array<TopicRow & { mindmap_count: number }>).map((row) => ({
       id: row.id, slug: row.slug, title: row.title, titleVi: row.title_vi,
       description: row.description, icon: row.icon, color: row.color,
       mindmapCount: row.mindmap_count,
     }));
   }
 
-  listMindmaps(status: "approved" | "draft" | "all" = "approved") {
-    const where = status === "all" ? "m.status != 'trashed'" : "m.status = ?";
+  listMindmaps(status: "approved" | "draft" | "all" = "approved", userId?: number) {
+    const statusWhere = status === "all" ? "m.status != 'trashed'" : "m.status = ?";
+    const ownerWhere = userId === undefined ? "1=1" : "(m.source='seed' OR m.user_id=?)";
+    const where = `${statusWhere} AND ${ownerWhere}`;
     const statement = this.db.prepare(`
       SELECT m.*, t.title_vi topic_title_vi, COUNT(n.id) node_count
       FROM mindmaps m JOIN topics t ON t.id=m.topic_id
       LEFT JOIN mindmap_nodes n ON n.mindmap_id=m.id
       WHERE ${where} GROUP BY m.id ORDER BY m.updated_at DESC, m.id DESC
     `);
-    const rows = status === "all" ? statement.all() : statement.all(status);
+    const args: unknown[] = [];
+    if (status !== "all") args.push(status);
+    if (userId !== undefined) args.push(userId);
+    const rows = statement.all(...args);
     return (rows as Array<MindmapRow & { topic_title_vi: string; node_count: number }>).map((row) => ({
       id: row.id, topicId: row.topic_id, title: row.title, description: row.description,
       status: row.status, source: row.source, topicTitleVi: row.topic_title_vi, nodeCount: row.node_count,
     }));
   }
 
-  getMindmap(id: number): Mindmap | null {
-    const map = this.db.prepare("SELECT * FROM mindmaps WHERE id=? AND status!='trashed'").get(id) as MindmapRow | undefined;
+  getMindmap(id: number, userId?: number): Mindmap | null {
+    const map = this.db.prepare(`SELECT * FROM mindmaps WHERE id=? AND status!='trashed' ${userId === undefined ? "" : "AND (source='seed' OR user_id=?)"}`).get(...(userId === undefined ? [id] : [id, userId])) as MindmapRow | undefined;
     if (!map) return null;
     const rows = this.db.prepare(`
       SELECT n.*, v.status vocabulary_status FROM mindmap_nodes n
@@ -100,11 +106,11 @@ export class ContentRepository {
     return { id: map.id, topicId: map.topic_id, title: map.title, description: map.description, status: map.status, source: map.source, nodes };
   }
 
-  saveMindmapDraft(input: SaveDraftInput): Mindmap {
+  saveMindmapDraft(input: SaveDraftInput, userId?: number): Mindmap {
     const parsed = SaveDraftSchema.parse(input);
     return withTransaction(this.db, () => {
-      const result = this.db.prepare(`INSERT INTO mindmaps(topic_id,title,description,status,source) VALUES (?,?,?,?,?)`)
-        .run(parsed.topicId, parsed.title, parsed.description, "draft", parsed.source);
+      const result = this.db.prepare(`INSERT INTO mindmaps(topic_id,title,description,status,source,user_id) VALUES (?,?,?,?,?,?)`)
+        .run(parsed.topicId, parsed.title, parsed.description, "draft", parsed.source, userId ?? null);
       const mapId = Number(result.lastInsertRowid);
       const nodeIds: number[] = [];
       const insertVocabulary = this.db.prepare(`INSERT OR IGNORE INTO vocabulary(term,normalized_term,meaning_vi,ipa,part_of_speech,cefr) VALUES (?,?,?,?,?,?)`);
@@ -119,18 +125,20 @@ export class ContentRepository {
           insertVocabulary.run(term, normalized, node.meaningVi, node.ipa, term.includes(" ") ? "phrase" : "word", node.cefr);
           vocabularyId = (getVocabulary.get(normalized) as { id: number }).id;
           insertReview.run(vocabularyId);
+          if (userId !== undefined) this.db.prepare("INSERT OR IGNORE INTO user_vocabulary_state(user_id,vocabulary_id,status) VALUES (?,?,'new')").run(userId,vocabularyId);
         }
         const parentId = node.parentIndex === null ? null : nodeIds[node.parentIndex] ?? null;
         const nodeId = Number(insertNode.run(mapId, parentId, vocabularyId, node.nodeType, node.label, node.meaningVi, node.ipa, node.color, node.x, node.y, index).lastInsertRowid);
         nodeIds.push(nodeId);
       });
       this.db.prepare("INSERT INTO draft_revisions(mindmap_id,revision,content_json) VALUES (?,?,?)").run(mapId, 1, JSON.stringify(parsed));
-      return this.getMindmap(mapId)!;
+      return this.getMindmap(mapId, userId)!;
     });
   }
 
-  updateMindmapNode(mapId: number, nodeId: number, input: UpdateNodeInput): MindmapNode | null {
+  updateMindmapNode(mapId: number, nodeId: number, input: UpdateNodeInput, userId?: number): MindmapNode | null {
     const parsed = UpdateNodeSchema.parse(input);
+    if (userId === undefined ? !this.getMindmap(mapId) : !this.db.prepare("SELECT 1 FROM mindmaps WHERE id=? AND user_id=? AND status!='trashed'").get(mapId,userId)) return null;
     const existing = this.db.prepare("SELECT * FROM mindmap_nodes WHERE id=? AND mindmap_id=?").get(nodeId, mapId) as Record<string, unknown> | undefined;
     if (!existing) return null;
     const fields: string[] = [];
@@ -151,13 +159,13 @@ export class ContentRepository {
         }
       }
     }
-    return this.getMindmap(mapId)?.nodes.find((node) => node.id === nodeId) ?? null;
+    return this.getMindmap(mapId, userId)?.nodes.find((node) => node.id === nodeId) ?? null;
   }
 
-  approveMindmapDraft(id: number): Mindmap | null {
-    const result = this.db.prepare("UPDATE mindmaps SET status='approved', updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='draft'").run(id);
+  approveMindmapDraft(id: number, userId?: number): Mindmap | null {
+    const result = this.db.prepare(`UPDATE mindmaps SET status='approved', updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='draft' ${userId === undefined ? "" : "AND user_id=?"}`).run(...(userId === undefined ? [id] : [id, userId]));
     if (!result.changes) return null;
     this.db.prepare("UPDATE draft_revisions SET approved_at=CURRENT_TIMESTAMP WHERE mindmap_id=? AND approved_at IS NULL").run(id);
-    return this.getMindmap(id);
+    return this.getMindmap(id, userId);
   }
 }

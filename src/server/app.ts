@@ -19,15 +19,19 @@ import { SpeakingRepository } from "./modules/speaking/repository";
 import { createSpeakingRouter } from "./modules/speaking/routes";
 import { DocumentRepository } from "./modules/documents/repository";
 import { createDocumentRouter } from "./modules/documents/routes";
+import { AuthService } from "./modules/auth/service";
+import { createAuthRouter } from "./modules/auth/routes";
+import { optionalAuth, requireAuth, requireSameOrigin } from "./modules/auth/middleware";
 
 export interface AppDependencies {
   db: AppDatabase;
   config?: AppConfig;
   nineRouter?: NineRouterClient;
   includeNotFound?: boolean;
+  protectApi?: boolean;
 }
 
-export function createApp({ db, config = loadConfig(), nineRouter, includeNotFound = true }: AppDependencies) {
+export function createApp({ db, config = loadConfig(), nineRouter, includeNotFound = true, protectApi = process.env.NODE_ENV !== "test" }: AppDependencies) {
   const app = express();
   const content = new ContentRepository(db);
   const learning = new LearningRepository(db);
@@ -36,10 +40,16 @@ export function createApp({ db, config = loadConfig(), nineRouter, includeNotFou
   const backups = new BackupService(db, config);
   const speaking = new SpeakingRepository(db);
   const documents = new DocumentRepository(db, config);
+  const auth = new AuthService(db, config.auth.sessionHours, config.auth.absoluteSessionHours);
 
   app.disable("x-powered-by");
+  app.set("trust proxy", "loopback");
   app.use(express.json({ limit: "1mb" }));
-  app.get("/api/health", async (_request, response) => response.json({ ok: true, aiOnline: await client.health() }));
+  app.use(optionalAuth(auth));
+  app.use("/api", requireSameOrigin);
+  app.use("/api/auth", createAuthRouter(auth, config.auth.secureCookies, config.auth.absoluteSessionHours));
+  app.get("/api/health", async (_request, response) => response.json({ ok: true, aiOnline: await client.health(), ...agent.getTutorStatus() }));
+  if (protectApi) app.use("/api", requireAuth);
   app.use("/api", createLibraryRouter(content));
   app.use("/api/mindmaps", createMindmapRouter(content));
   app.use("/api/learning", createLearningRouter(learning));
@@ -61,4 +71,3 @@ export function createApp({ db, config = loadConfig(), nineRouter, includeNotFou
   app.use(errorHandler);
   return app;
 }
-

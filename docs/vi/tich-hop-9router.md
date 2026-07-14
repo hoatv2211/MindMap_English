@@ -100,3 +100,21 @@ Không gửi toàn bộ thư viện mặc định. Chỉ gửi audio hoặc sect
 - Image chỉ gửi khi người dùng yêu cầu tạo.
 - Log không ghi API key hoặc raw audio.
 - Mindmap/quiz/SRS hoạt động khi AI offline.
+
+## 10. AI tutor theo account
+
+- Policy runtime nằm tại `.hermes/skills/mindmap-english-tutor/SKILL.md`; loader chỉ đọc path cố định trong project và có fallback khi file lỗi.
+- Mỗi request tutor nhận learner snapshot giới hạn theo `user_id`, `profile_revision`, skill version và schema version.
+- Chat lưu nhiều thread trong SQLite. User có thể tạo mới, đổi tên, lưu trữ, khôi phục, xóa và retry message lỗi.
+- Câu hỏi kiến thức độc lập có thể dùng response cache. Follow-up, tiến độ cá nhân và retry luôn gọi provider.
+- Không gửi password, recovery code, session token, raw SQL hoặc toàn bộ database tới 9Router.
+
+## 11. VPS
+
+```dotenv
+HOST=0.0.0.0
+ALLOW_REMOTE_BINDING=true
+AUTH_SECURE_COOKIES=true
+```
+
+Chỉ bật remote binding sau HTTPS reverse proxy. Proxy phải giữ `Host` gốc để same-origin guard so khớp `Origin`. Không serve `DATA_DIR`, SQLite, media hoặc backup dưới static root.
