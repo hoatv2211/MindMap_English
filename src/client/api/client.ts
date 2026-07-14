@@ -1,4 +1,7 @@
-import type { Dashboard, DictionaryLookup, Mindmap } from "../../shared/contracts";
+﻿import type { Dashboard, DictionaryLookup, Mindmap } from "../../shared/contracts";
+
+export interface AuthUser { id:number; username:string; profileRevision:number }
+export interface AuthResult { user:AuthUser; recoveryCode:string }
 
 export class ApiError extends Error {
   constructor(message: string, readonly status: number, readonly code?: string) { super(message); }
@@ -8,7 +11,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, { ...init, headers: { ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...init?.headers } });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ error: response.statusText }));
-    throw new ApiError(body.error ?? "Yêu cầu thất bại", response.status, body.code);
+    throw new ApiError(body.error ?? "YÃªu cáº§u tháº¥t báº¡i", response.status, body.code);
   }
   const contentType = response.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) return response.json() as Promise<T>;
@@ -16,6 +19,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  authMe: () => request<{user:AuthUser}>("/api/auth/me"),
+  register: (input:{username:string;password:string;passwordConfirmation:string}) => request<AuthResult>("/api/auth/register",{method:"POST",body:JSON.stringify(input)}),
+  login: (input:{username:string;password:string}) => request<{user:AuthUser}>("/api/auth/login",{method:"POST",body:JSON.stringify(input)}),
+  logout: () => request<void>("/api/auth/logout",{method:"POST"}),
+  recoverPassword: (input:{username:string;recoveryCode:string;password:string;passwordConfirmation:string}) => request<AuthResult>("/api/auth/password/recover",{method:"POST",body:JSON.stringify(input)}),
   health: () => request<{ ok: boolean; aiOnline: boolean }>("/api/health"),
   dashboard: () => request<Dashboard>("/api/learning/dashboard"),
   topics: () => request<Array<{id:number;slug:string;title:string;titleVi:string;icon:string;color:string;mindmapCount:number}>>("/api/topics"),
@@ -71,3 +79,4 @@ export interface DocumentSectionResult {id:number;documentId:number;heading:stri
 export interface DocumentDetail extends DocumentSummaryResult {storagePath:string;sections:DocumentSectionResult[]}
 export interface ExtractionCandidate {category:"recommended"|"optional"|"skip";reason:string}
 export interface DocumentExtractionResult {jobId:number;draft:{vocabulary:Array<ExtractionCandidate&{term:string;meaningVi:string}>;sentences:Array<ExtractionCandidate&{sentence:string}>}}
+
