@@ -1,9 +1,13 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import type { AppDatabase } from "../../db/database";
 import type { ContentRepository, SaveDraftInput } from "../content/repository";
 import type { LearningRepository } from "../learning/repository";
 import { NineRouterClient } from "./ninerouter-client";
 import { MindmapDraftInputSchema, type MindmapDraftInput } from "../../../shared/contracts";
+import { ChatRepository } from "./chat-repository";
+import { LearnerContextService } from "./learner-context";
+import { loadTutorSkill } from "./skill-loader";
+import { AgentResponseCache, isCacheEligibleQuestion } from "./response-cache";
 
 export const GeneratedMindmapSchema = z.object({
   title: z.string().min(2).max(120),
@@ -26,6 +30,7 @@ export class AgentToolService {
     private readonly content: ContentRepository,
     private readonly learning: LearningRepository,
     private readonly client: NineRouterClient,
+    private readonly projectRoot: string = process.cwd(),
   ) {}
 
   getLearningProfile() { return this.learning.getProgress(); }
@@ -67,6 +72,40 @@ export class AgentToolService {
     return this.content.saveMindmapDraft({ topicId, title: generated.title, description: generated.description, source: "ai", nodes });
   }
 
+  getChatRepository() { return new ChatRepository(this.db); }
+  getTutorStatus() { const skill=loadTutorSkill(this.projectRoot); return { skill: skill.name, skillVersion: skill.version, degraded: skill.degraded }; }
+
+  async sendTutorMessage(userId: number, threadId: number, message: string) {
+    const chat = this.getChatRepository();
+    if (!chat.getThread(userId, threadId)) return null;
+    const skill = loadTutorSkill(this.projectRoot);
+    const context = new LearnerContextService(this.db).get(userId, skill.version);
+    const previous = (chat.listMessages(userId, threadId) ?? []) as Array<{ role: "user" | "assistant" | "tool"; content: string }>;
+    const responseCache = new AgentResponseCache(this.db);
+    const cacheEligible = isCacheEligibleQuestion(message, previous.filter(item => item.role === "user").length);
+    const cacheKey = responseCache.key({ userId, profileRevision: context.snapshot.profileRevision, skillVersion: skill.version, model: "", question: message });
+    chat.addMessage(userId, threadId, "user", message);
+    if (cacheEligible) {
+      const cached = responseCache.get(cacheKey, userId);
+      if (cached) {
+        const saved = chat.addMessage(userId, threadId, "assistant", cached.responseText, { cacheHit: true, skillVersion: skill.version, profileRevision: context.snapshot.profileRevision });
+        return { message: saved, reply: cached.responseText, suggestions: ["Tạo ví dụ riêng của bạn"], contextCacheHit: context.cacheHit, responseCacheHit: true, skill: this.getTutorStatus() };
+      }
+    }
+    const history = (chat.listMessages(userId, threadId) ?? []).slice(-12) as Array<{ role: "user" | "assistant" | "tool"; content: string }>;
+    try {
+      const reply = await this.client.chatText([
+        { role: "system", content: `${skill.content}\n\nLearner snapshot (bounded local evidence):\n${JSON.stringify(context.snapshot)}` },
+        ...history.filter(item => item.role !== "tool").map(item => ({ role: item.role as "user" | "assistant", content: item.content })),
+      ]);
+      if (cacheEligible) responseCache.set(cacheKey, { userId, profileRevision: context.snapshot.profileRevision, skillVersion: skill.version, model: "", responseText: reply });
+      const saved = chat.addMessage(userId, threadId, "assistant", reply, { skillVersion: skill.version, profileRevision: context.snapshot.profileRevision });
+      return { message: saved, reply, suggestions: context.snapshot.unfinishedSession ? ["Tiếp tục bài đang dở"] : ["Ôn từ yếu hôm nay"], contextCacheHit: context.cacheHit, responseCacheHit: false, skill: this.getTutorStatus() };
+    } catch (error) {
+      chat.addMessage(userId, threadId, "assistant", error instanceof Error ? error.message : "Không thể gọi AI", { status: "failed", skillVersion: skill.version, profileRevision: context.snapshot.profileRevision });
+      throw error;
+    }
+  }
   async tutor(message: string) {
     const profile = this.getLearningProfile();
     const reply = await this.client.chatText([
@@ -99,5 +138,9 @@ export class AgentToolService {
     return (this.db.prepare(`SELECT term,meaning_vi meaningVi FROM vocabulary WHERE normalized_term IN (${placeholders})`).all(...terms) as Array<{ term: string; meaningVi: string }>);
   }
 }
+
+
+
+
 
 

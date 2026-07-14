@@ -1,23 +1,16 @@
-import { Send, Sparkles, X } from "lucide-react";
+﻿import { Archive, History, Plus, Send, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { api } from "../api/client";
+import { api, type AgentMessage, type AgentThread } from "../api/client";
 import { useAppStore } from "../state/app-store";
 
-export function AgentDrawer() {
-  const { setAgentOpen, agentDraft, clearAgentDraft } = useAppStore();
-  const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([{ role: "assistant", content: "Bạn muốn luyện từ, sửa câu hay chuẩn bị một tình huống giao tiếp?" }]);
-  const [loading, setLoading] = useState(false);
-  useEffect(() => { if (agentDraft) { setMessage(agentDraft); clearAgentDraft(); } }, [agentDraft, clearAgentDraft]);
-  const send = async () => {
-    const text = message.trim();
-    if (!text || loading) return;
-    setMessages((items) => [...items, { role: "user", content: text }]);
-    setMessage("");
-    setLoading(true);
-    try { const result = await api.tutor(text); setMessages((items) => [...items, { role: "assistant", content: result.reply }]); }
-    catch (error) { setMessages((items) => [...items, { role: "assistant", content: error instanceof Error ? error.message : "Không thể gọi AI. Vui lòng thử lại." }]); }
-    finally { setLoading(false); }
-  };
-  return <aside className="agent-drawer" aria-label="AI gia sư"><header><span><Sparkles size={18}/> Gia sư AI</span><button onClick={() => setAgentOpen(false)} aria-label="Đóng"><X size={18}/></button></header><div className="agent-messages">{messages.map((item, index) => <div key={index} className={`message ${item.role}`}>{item.content}</div>)}{loading && <div className="message assistant typing">Đang suy nghĩ…</div>}</div><div className="agent-input"><textarea value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder="Hỏi cách dùng một từ..."/><button onClick={() => void send()} aria-label="Gửi"><Send size={18}/></button></div></aside>;
+export function AgentDrawer(){
+  const{setAgentOpen,agentDraft,clearAgentDraft}=useAppStore();const[threads,setThreads]=useState<AgentThread[]>([]);const[activeId,setActiveId]=useState<number|null>(null);const[messages,setMessages]=useState<AgentMessage[]>([]);const[message,setMessage]=useState("");const[loading,setLoading]=useState(false);const[status,setStatus]=useState<{degraded:boolean}|null>(null);const[historyOpen,setHistoryOpen]=useState(true);
+  useEffect(()=>{void Promise.all([api.agentStatus(),api.agentThreads()]).then(async([skill,items])=>{setStatus(skill);setThreads(items);if(items[0]){setActiveId(items[0].id);setMessages(await api.agentMessages(items[0].id))}}).catch(()=>setStatus({degraded:true}))},[]);
+  useEffect(()=>{if(agentDraft){setMessage(agentDraft);clearAgentDraft()}},[agentDraft,clearAgentDraft]);
+  const open=async(thread:AgentThread)=>{setActiveId(thread.id);setMessages(await api.agentMessages(thread.id));setHistoryOpen(false)};
+  const create=async()=>{const thread=await api.createAgentThread();setThreads(items=>[thread,...items]);setActiveId(thread.id);setMessages([]);setHistoryOpen(false)};
+  const send=async()=>{const text=message.trim();if(!text||loading)return;let threadId=activeId;if(!threadId){const thread=await api.createAgentThread();threadId=thread.id;setActiveId(threadId);setThreads(items=>[thread,...items])}const optimistic:AgentMessage={id:-Date.now(),threadId,role:"user",content:text,status:"completed",cacheHit:0};setMessages(items=>[...items,optimistic]);setMessage("");setLoading(true);try{const result=await api.sendAgentMessage(threadId,text);setMessages(items=>[...items,{...result.message,content:result.reply}]);setThreads(await api.agentThreads())}catch(error){setMessages(items=>[...items,{id:-Date.now()-1,threadId:threadId!,role:"assistant",content:error instanceof Error?error.message:"Không thể gọi AI",status:"failed",cacheHit:0}])}finally{setLoading(false)}};
+  const archive=async(id:number)=>{await api.archiveAgentThread(id);setThreads(items=>items.filter(item=>item.id!==id));if(activeId===id){setActiveId(null);setMessages([])}};
+  const remove=async(id:number)=>{if(!window.confirm("Xóa cuộc trò chuyện này?"))return;await api.deleteAgentThread(id);setThreads(items=>items.filter(item=>item.id!==id));if(activeId===id){setActiveId(null);setMessages([])}};
+  return <aside className="agent-drawer agent-workspace" aria-label="AI gia sư"><section className={`agent-history ${historyOpen?"open":""}`}><div className="agent-history-head"><b>Lịch sử</b><button aria-label="Chat mới" onClick={()=>void create()}><Plus size={16}/>Chat mới</button></div><div className="agent-thread-list">{threads.map(thread=><article key={thread.id} className={thread.id===activeId?"active":""}><button onClick={()=>void open(thread)}><b>{thread.title||"Cuộc trò chuyện mới"}</b><small>{thread.preview||"Chưa có tin nhắn"}</small></button><span><button aria-label="Lưu trữ" onClick={()=>void archive(thread.id)}><Archive size={14}/></button><button aria-label="Xóa" onClick={()=>void remove(thread.id)}><Trash2 size={14}/></button></span></article>)}</div></section><section className="agent-conversation"><header><div><button className="history-toggle" aria-label="Mở lịch sử" onClick={()=>setHistoryOpen(value=>!value)}><History size={18}/></button><span><Sparkles size={18}/><span><b>Gia sư tiếng Anh</b><small>{status?.degraded?"Skill dự phòng":"Hồ sơ học tập đã kết nối"}</small></span></span></div><button onClick={()=>setAgentOpen(false)} aria-label="Đóng"><X size={18}/></button></header><div className="agent-messages">{messages.length===0&&<div className="agent-empty"><Sparkles size={28}/><h3>Mình học gì tiếp?</h3><button onClick={()=>setMessage("Ôn các từ yếu của tôi hôm nay")}>Ôn từ yếu hôm nay</button><button onClick={()=>setMessage("Sửa câu tiếng Anh này: ")}>Sửa một câu</button><button onClick={()=>setMessage("Tiếp tục bài học đang dở")}>Tiếp tục bài đang dở</button></div>}{messages.map(item=><div key={item.id} className={`message ${item.role} ${item.status==="failed"?"failed":""}`}>{item.content}{Boolean(item.cacheHit)&&<small className="cache-marker">Đã dùng câu trả lời đã lưu</small>}</div>)}{loading&&<div className="message assistant typing">Đang suy nghĩ…</div>}</div><div className="agent-input"><textarea value={message} onChange={event=>setMessage(event.target.value)} onKeyDown={event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();void send()}}} placeholder="Hỏi, sửa câu hoặc luyện hội thoại…"/><button onClick={()=>void send()} aria-label="Gửi"><Send size={18}/></button></div></section></aside>;
 }
