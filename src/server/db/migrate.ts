@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS review_cards (
 
 CREATE TABLE IF NOT EXISTS learning_sessions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  module_id INTEGER REFERENCES learning_modules(id) ON DELETE SET NULL,
   duration_minutes INTEGER NOT NULL CHECK(duration_minutes IN (10,20)),
   status TEXT NOT NULL CHECK(status IN ('active','completed','abandoned')) DEFAULT 'active',
   started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -287,6 +288,39 @@ CREATE TABLE IF NOT EXISTS document_highlights (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS learning_paths (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  level TEXT NOT NULL CHECK(level IN ('A1','A2','B1','B2')),
+  description TEXT NOT NULL DEFAULT '',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS learning_modules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  path_id INTEGER NOT NULL REFERENCES learning_paths(id) ON DELETE CASCADE,
+  slug TEXT NOT NULL,
+  title TEXT NOT NULL,
+  goal_vi TEXT NOT NULL DEFAULT '',
+  cefr TEXT NOT NULL CHECK(cefr IN ('A1','A2','B1','B2')),
+  topic_slug TEXT NOT NULL DEFAULT '',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(path_id, slug)
+);
+
+CREATE TABLE IF NOT EXISTS user_module_progress (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  module_id INTEGER NOT NULL REFERENCES learning_modules(id) ON DELETE CASCADE,
+  status TEXT NOT NULL CHECK(status IN ('locked','active','completed')) DEFAULT 'locked',
+  completed_items INTEGER NOT NULL DEFAULT 0,
+  total_items INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(user_id,module_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_topics_sort ON topics(sort_order);
 CREATE INDEX IF NOT EXISTS idx_mindmaps_topic ON mindmaps(topic_id, status);
 CREATE INDEX IF NOT EXISTS idx_nodes_map ON mindmap_nodes(mindmap_id, sort_order);
@@ -373,6 +407,58 @@ CREATE TABLE IF NOT EXISTS agent_response_cache (
   response_text TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS vocabulary_inbox_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  raw_text TEXT NOT NULL,
+  normalized_text TEXT NOT NULL,
+  context_text TEXT NOT NULL DEFAULT '',
+  source_type TEXT NOT NULL CHECK(source_type IN ('quick_capture','agent_chat','mindmap')),
+  source_reference TEXT NOT NULL DEFAULT '',
+  hint_mindmap_id INTEGER REFERENCES mindmaps(id) ON DELETE SET NULL,
+  hint_parent_node_id INTEGER REFERENCES mindmap_nodes(id) ON DELETE SET NULL,
+  status TEXT NOT NULL CHECK(status IN ('queued','processing','ready','failed','approved','dismissed')) DEFAULT 'queued',
+  error_message TEXT,
+  approved_vocabulary_id INTEGER REFERENCES vocabulary(id) ON DELETE SET NULL,
+  approved_mindmap_id INTEGER REFERENCES mindmaps(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  approved_at TEXT
+);
+CREATE TABLE IF NOT EXISTS vocabulary_inbox_drafts (
+  inbox_item_id INTEGER PRIMARY KEY REFERENCES vocabulary_inbox_items(id) ON DELETE CASCADE,
+  normalized_term TEXT NOT NULL,
+  display_term TEXT NOT NULL,
+  meaning_vi TEXT NOT NULL,
+  ipa TEXT NOT NULL DEFAULT '',
+  part_of_speech TEXT NOT NULL DEFAULT '',
+  cefr TEXT NOT NULL CHECK(cefr IN ('A1','A2','B1','B2')),
+  item_type TEXT NOT NULL CHECK(item_type IN ('word','phrase','sentence')),
+  examples_json TEXT NOT NULL,
+  placement_json TEXT NOT NULL,
+  model TEXT NOT NULL DEFAULT '',
+  prompt_version TEXT NOT NULL DEFAULT '',
+  skill_version TEXT NOT NULL DEFAULT '',
+  user_edited INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS user_vocabulary_examples (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  vocabulary_id INTEGER NOT NULL REFERENCES vocabulary(id) ON DELETE CASCADE,
+  sentence TEXT NOT NULL,
+  translation_vi TEXT NOT NULL,
+  example_role TEXT NOT NULL CHECK(example_role IN ('basic','daily_life','personalized','learner')),
+  usage_note TEXT NOT NULL DEFAULT '',
+  fingerprint TEXT NOT NULL,
+  source_inbox_item_id INTEGER REFERENCES vocabulary_inbox_items(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id,fingerprint)
+);
+CREATE INDEX IF NOT EXISTS idx_inbox_user_status ON vocabulary_inbox_items(user_id,status,updated_at);
+CREATE INDEX IF NOT EXISTS idx_personal_examples_vocab ON user_vocabulary_examples(user_id,vocabulary_id);
 CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id, expires_at);
 CREATE INDEX IF NOT EXISTS idx_recovery_user ON password_recovery_codes(user_id, consumed_at);
 CREATE INDEX IF NOT EXISTS idx_agent_cache_user ON agent_response_cache(user_id, created_at);
@@ -386,7 +472,7 @@ function createProfileRevisionTriggers(db: AppDatabase): void {
   const tables = [
     "mindmaps", "learning_sessions", "review_attempts", "sentence_notebook",
     "speaking_sessions", "speaking_attempts", "document_sources", "document_highlights",
-    "user_learning_progress", "user_vocabulary_state",
+    "user_learning_progress", "user_vocabulary_state", "vocabulary_inbox_items", "user_vocabulary_examples",
   ];
   for (const table of tables) {
     db.exec(`
@@ -415,7 +501,9 @@ export function migrate(db: AppDatabase): void {
   db.exec(migrationSql);
   db.exec(authMigrationSql);
   ensureColumn(db, "mindmaps", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
+  ensureColumn(db, "mindmaps", "copied_from_mindmap_id", "INTEGER REFERENCES mindmaps(id) ON DELETE SET NULL");
   ensureColumn(db, "learning_sessions", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
+  ensureColumn(db, "learning_sessions", "module_id", "INTEGER REFERENCES learning_modules(id) ON DELETE SET NULL");
   ensureColumn(db, "review_attempts", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
   ensureColumn(db, "sentence_notebook", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
   ensureColumn(db, "speaking_sessions", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
@@ -437,6 +525,7 @@ export function migrate(db: AppDatabase): void {
   ensureColumn(db, "user_vocabulary_state", "lapses", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "user_vocabulary_state", "due_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP");
   ensureColumn(db, "user_vocabulary_state", "last_reviewed_at", "TEXT");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_mindmaps_personal_copy ON mindmaps(user_id,copied_from_mindmap_id) WHERE copied_from_mindmap_id IS NOT NULL AND status != 'trashed'");
   createProfileRevisionTriggers(db);
   db.prepare("INSERT OR IGNORE INTO schema_migrations(version) VALUES (1)").run();
   db.prepare("INSERT OR IGNORE INTO user_progress(id) VALUES (1)").run();

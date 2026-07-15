@@ -41,6 +41,12 @@ describe("BackupService", () => {
     db.prepare("INSERT INTO auth_sessions(user_id,token_hash,expires_at,absolute_expires_at) VALUES (1,?,?,?)").run("session-secret",new Date(Date.now()+60000).toISOString(),new Date(Date.now()+120000).toISOString());
     db.prepare("INSERT INTO password_recovery_codes(user_id,code_hash) VALUES (1,?)").run("recovery-secret");
     db.prepare("INSERT INTO learner_context_cache(user_id,profile_revision,skill_version,schema_version,snapshot_json) VALUES (1,1,'v1','v1','prompt-secret')").run();
+    db.prepare("INSERT INTO topics(slug,title,title_vi) VALUES ('work','Work','Cong viec')").run();
+    db.prepare("INSERT INTO mindmaps(topic_id,title,status,source,user_id) VALUES (1,'Negotiation','draft','ai',1)").run();
+    db.prepare("INSERT INTO vocabulary(term,normalized_term,meaning_vi,cefr) VALUES ('negotiate','negotiate','dam phan','B1')").run();
+    const inboxId=Number(db.prepare("INSERT INTO vocabulary_inbox_items(user_id,raw_text,normalized_text,source_type,status,approved_vocabulary_id,approved_mindmap_id,approved_at) VALUES (1,'negotiate','negotiate','quick_capture','approved',1,1,CURRENT_TIMESTAMP)").run().lastInsertRowid);
+    db.prepare("INSERT INTO vocabulary_inbox_drafts(inbox_item_id,normalized_term,display_term,meaning_vi,cefr,item_type,examples_json,placement_json,model,prompt_version,skill_version) VALUES (?,?,?,?,?,?,?,?,?,?,?)").run(inboxId,'negotiate','negotiate','dam phan','B1','word','[{\"role\":\"basic\",\"sentence\":\"We negotiate.\",\"translationVi\":\"Chung toi dam phan.\",\"usageNote\":\"\"}]','{\"mindmapId\":1,\"parentNodeId\":null,\"reason\":\"Work\",\"newMindmap\":null}','test-model','v1','1.1.0');
+    db.prepare("INSERT INTO user_vocabulary_examples(user_id,vocabulary_id,sentence,translation_vi,example_role,fingerprint,source_inbox_item_id) VALUES (1,1,'We negotiate.','Chung toi dam phan.','basic','backup-example',?)").run(inboxId);
     const service = new BackupService(db, config);
     const first = await service.createBackup(1);
     await service.createBackup(2);
@@ -54,6 +60,9 @@ describe("BackupService", () => {
     expect((snapshot.prepare("SELECT COUNT(*) count FROM auth_sessions").get() as {count:number}).count).toBe(0);
     expect((snapshot.prepare("SELECT COUNT(*) count FROM password_recovery_codes").get() as {count:number}).count).toBe(0);
     expect((snapshot.prepare("SELECT COUNT(*) count FROM learner_context_cache").get() as {count:number}).count).toBe(0);
+    expect(snapshot.prepare("SELECT status,approved_vocabulary_id approvedVocabularyId,approved_mindmap_id approvedMindmapId FROM vocabulary_inbox_items WHERE id=?").get(inboxId)).toMatchObject({status:"approved",approvedVocabularyId:1,approvedMindmapId:1});
+    expect((snapshot.prepare("SELECT COUNT(*) count FROM vocabulary_inbox_drafts WHERE inbox_item_id=?").get(inboxId) as {count:number}).count).toBe(1);
+    expect(snapshot.prepare("SELECT sentence,example_role exampleRole,source_inbox_item_id sourceInboxItemId FROM user_vocabulary_examples WHERE user_id=1").get()).toMatchObject({sentence:"We negotiate.",exampleRole:"basic",sourceInboxItemId:inboxId});
     snapshot.close();
     db.close();
   });

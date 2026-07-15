@@ -13,7 +13,8 @@ export function createLearningRouter(repository: LearningRepository) {
   const router = Router();
   router.post("/sessions", (request, response) => {
     const duration = request.body.duration === 10 ? 10 : 20;
-    response.status(201).json(repository.createSession(duration, (request as AuthenticatedRequest).auth?.id));
+    const moduleId = Number.isInteger(request.body.moduleId) ? Number(request.body.moduleId) : undefined;
+    response.status(201).json(repository.createSession(duration, (request as AuthenticatedRequest).auth?.id, moduleId));
   });
   router.get("/sessions/:id", (request, response) => {
     const session = repository.getSession(Number(request.params.id), (request as AuthenticatedRequest).auth?.id);

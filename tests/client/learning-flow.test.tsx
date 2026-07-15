@@ -1,8 +1,15 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import {cleanup,render,screen} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
-import { QuizCard } from "../../src/client/components/QuizCard";
-
+import {afterEach,describe,expect,it,vi} from "vitest";
+import {QuizCard} from "../../src/client/components/QuizCard";
+import {LearningPromptCard} from "../../src/client/components/LearningPromptCard";
+afterEach(cleanup);
 const item={id:1,vocabularyId:1,activityType:"meaning-recall",sortOrder:0,isNew:1,term:"apple",meaningVi:"quả táo",ipa:"/ˈæp.əl/",cefr:"A1",status:"new",example:"I eat an apple.",exampleVi:"Tôi ăn một quả táo."};
-describe("QuizCard",()=>{it("reveals answer and records an explicit SRS grade",async()=>{const onGrade=vi.fn();render(<QuizCard item={item} onGrade={onGrade} onSpeak={vi.fn()}/>);await userEvent.type(screen.getByPlaceholderText("Nhập từ hoặc nghĩa..."),"apple");await userEvent.click(screen.getByText("Kiểm tra"));expect(screen.getByText("I eat an apple.")).toBeInTheDocument();await userEvent.click(screen.getByText("Tốt"));expect(onGrade).toHaveBeenCalledWith(expect.objectContaining({answer:"apple",isCorrect:true,grade:"good"}))})});
+describe("learning cards",()=>{
+ it("reveals answer and records explicit SRS grade",async()=>{const onGrade=vi.fn();render(<QuizCard item={item} onGrade={onGrade} onSpeak={vi.fn()}/>);await userEvent.type(screen.getByPlaceholderText("Nhập từ hoặc cụm từ tiếng Anh..."),"apple");await userEvent.click(screen.getByText("Kiểm tra"));expect(screen.getByText("I eat an apple.")).toBeInTheDocument();await userEvent.click(screen.getByText("Tốt"));expect(onGrade).toHaveBeenCalledWith(expect.objectContaining({answer:"apple",isCorrect:true,grade:"good"}))});
+ it("does not leak answer and counts first flip once",async()=>{const reveal=vi.fn();const user=userEvent.setup();render(<LearningPromptCard item={item} onFirstReveal={reveal} onSpeak={vi.fn()}/>);expect(screen.getByText("quả táo")).toBeInTheDocument();expect(screen.queryByText("apple")).not.toBeInTheDocument();await user.click(screen.getByRole("button",{name:"Lật thẻ"}));expect(screen.getByText("apple")).toBeInTheDocument();await user.click(screen.getByRole("button",{name:"Lật lại"}));await user.click(screen.getByRole("button",{name:"Lật thẻ"}));expect(reveal).toHaveBeenCalledTimes(1)});
+ it("shows hint in expected answer language",async()=>{render(<QuizCard item={{...item,activityType:"recall"}} onGrade={vi.fn()} onSpeak={vi.fn()}/>);await userEvent.click(screen.getByText("Gợi ý tiếng Việt"));expect(screen.getByText(/qu/)).toBeInTheDocument()});
+ it("shows answer quality feedback after reveal",async()=>{render(<QuizCard item={{...item,activityType:"recall",meaningVi:"quả táo, trái táo"}} onGrade={vi.fn()} onSpeak={vi.fn()}/>);await userEvent.type(screen.getByPlaceholderText("Nhập nghĩa hoặc câu tiếng Việt..."),"qua tao");await userEvent.click(screen.getByText("Kiểm tra"));expect(screen.getByText("Đúng rồi — hệ thống đã chấp nhận cách viết này.")).toBeInTheDocument()});
+ it("shows retry feedback when answer is different",async()=>{render(<QuizCard item={{...item,activityType:"recall"}} onGrade={vi.fn()} onSpeak={vi.fn()}/>);await userEvent.type(screen.getByPlaceholderText("Nhập nghĩa hoặc câu tiếng Việt..."),"con chó");await userEvent.click(screen.getByText("Kiểm tra"));expect(screen.getByText("Chưa khớp. Xem đáp án, tự nói lại, rồi chọn Quên hoặc Khó.")).toBeInTheDocument()});
+});

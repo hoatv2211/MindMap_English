@@ -23,7 +23,7 @@ describe("AgentToolService", () => {
     const generated = await service.generateMindmapDraft({ topic: "breakfast", situation: "cafe", cefr: "B1" }, 1);
     const saved = service.saveGeneratedDraft(1, generated.draft, 1);
     expect(saved.status).toBe("draft");
-    expect(new ContentRepository(db).listMindmaps("approved", 1)).toHaveLength(1);
+    expect(new ContentRepository(db).listMindmaps("approved", 1)).toHaveLength(17);
     expect((db.prepare("SELECT user_id userId FROM generation_jobs WHERE id=?").get(generated.jobId) as {userId:number}).userId).toBe(1);
     expect((db.prepare("SELECT user_id userId FROM mindmaps WHERE id=?").get(saved.id) as {userId:number}).userId).toBe(1);
   });
@@ -34,7 +34,7 @@ describe("AgentToolService", () => {
     await expect(service.generateMindmapDraft({ topic: "travel", situation: "airport", cefr: "B1" })).rejects.toThrow("offline");
     const job = db.prepare("SELECT status FROM generation_jobs ORDER BY id DESC LIMIT 1").get() as { status: string };
     expect(job.status).toBe("failed");
-    expect(new ContentRepository(db).listMindmaps("all")).toHaveLength(1);
+    expect(new ContentRepository(db).listMindmaps("all")).toHaveLength(17);
   });
 
   it("uses plain chat text for tutor replies", async () => {
@@ -42,4 +42,16 @@ describe("AgentToolService", () => {
     const service = new AgentToolService(db, new ContentRepository(db), new LearningRepository(db), client as never);
     await expect(service.tutor("hello")).resolves.toEqual({ reply: "Hello! How can I help?", suggestions: [] });
     expect(client.chatText).toHaveBeenCalledOnce();
+  });
+
+  it("generates and saves an extension draft into an existing mindmap", async () => {
+    db.prepare("INSERT INTO users(username,normalized_username,password_hash) VALUES ('owner','owner','hash')").run();
+    const seedMap = db.prepare("SELECT id FROM mindmaps WHERE title='Daily Routine'").get() as {id:number};
+    const client = { chatJson: vi.fn(async () => ({ mindmapTitle:"Daily Routine", branches:[{parentLabel:"morning",meaningVi:"buổi sáng",color:"amber",words:[{term:"make the bed",meaningVi:"dọn giường",ipa:"",cefr:"A2",example:"I make the bed after I wake up.",exampleVi:"Tôi dọn giường sau khi thức dậy."},{term:"pack my bag",meaningVi:"soạn cặp/túi",ipa:"",cefr:"A2",example:"I pack my bag before work.",exampleVi:"Tôi soạn túi trước khi đi làm."}]}] })) };
+    const service = new AgentToolService(db, new ContentRepository(db), new LearningRepository(db), client as never);
+    const draft = await service.generateMindmapExtensionDraft({ mindmapId:seedMap.id, instruction:"thêm từ A2 buổi sáng" }, 1);
+    expect(draft.duplicates).toEqual([]);
+    const saved = service.saveMindmapExtensionDraft(seedMap.id, draft.draft, 1);
+    expect(saved.nodes.some(node => node.label === "make the bed")).toBe(true);
+    expect(db.prepare("SELECT 1 FROM user_vocabulary_state WHERE user_id=1 AND vocabulary_id=(SELECT id FROM vocabulary WHERE normalized_term='make the bed')").get()).toBeTruthy();
   });});

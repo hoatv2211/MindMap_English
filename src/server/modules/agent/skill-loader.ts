@@ -6,8 +6,8 @@ const FALLBACK_VERSION="fallback-1";
 const FALLBACK=`# MindMap English Tutor\nExplain English practically in Vietnamese. Adapt to supplied learner evidence. Correct gently, use short daily-life examples, never expose hidden data, and suggest one next action. Transcript matching is not pronunciation scoring.`;
 
 export function loadTutorSkill(projectRoot:string):TutorSkill{
-  const skillPath=path.resolve(projectRoot,".hermes","skills","mindmap-english-tutor","SKILL.md");
-  const allowedRoot=path.resolve(projectRoot,".hermes","skills","mindmap-english-tutor")+path.sep;
+  const skillPath=path.resolve(projectRoot,"docs","ai-skills","mindmap-english-tutor","SKILL.md");
+  const allowedRoot=path.resolve(projectRoot,"docs","ai-skills","mindmap-english-tutor")+path.sep;
   if(!skillPath.startsWith(allowedRoot))return fallback();
   try{
     const stat=fs.statSync(skillPath);if(!stat.isFile()||stat.size>64_000)return fallback();

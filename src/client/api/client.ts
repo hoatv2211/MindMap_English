@@ -27,13 +27,24 @@ export const api = {
   logout: () => request<void>("/api/auth/logout",{method:"POST"}),
   recoverPassword: (input:{username:string;recoveryCode:string;password:string;passwordConfirmation:string}) => request<AuthResult>("/api/auth/password/recover",{method:"POST",body:JSON.stringify(input)}),
   changePassword: (input:{currentPassword:string;password:string;passwordConfirmation:string}) => request<{user:AuthUser}>("/api/auth/password/change",{method:"POST",body:JSON.stringify(input)}),
+  captureVocabulary: (input:VocabularyCaptureInput) => request<VocabularyInboxItem>("/api/vocabulary-inbox",{method:"POST",body:JSON.stringify(input)}),
+  vocabularyInbox: (status?:string) => request<VocabularyInboxItem[]>(`/api/vocabulary-inbox${status?`?status=${encodeURIComponent(status)}`:""}`),
+  vocabularyInboxItem: (id:number) => request<VocabularyInboxItem>(`/api/vocabulary-inbox/${id}`),
+  updateVocabularyDraft: (id:number,draft:VocabularyEnrichmentDraft) => request<VocabularyInboxItem>(`/api/vocabulary-inbox/${id}/draft`,{method:"PATCH",body:JSON.stringify(draft)}),
+  retryVocabularyEnrichment: (id:number) => request<VocabularyInboxItem>(`/api/vocabulary-inbox/${id}/enrich`,{method:"POST"}),
+  approveVocabulary: (id:number,input:{mindmapId?:number|null;parentNodeId?:number|null}) => request<{vocabularyId:number;mindmapId:number|null}>(`/api/vocabulary-inbox/${id}/approve`,{method:"POST",body:JSON.stringify(input)}),
+  dismissVocabulary: (id:number) => request<VocabularyInboxItem>(`/api/vocabulary-inbox/${id}/dismiss`,{method:"POST"}),
+  saveAgentVocabularyNote: (input:VocabularyCaptureInput) => request<VocabularyInboxItem>("/api/agent/vocabulary-notes",{method:"POST",body:JSON.stringify(input)}),
   health: () => request<{ ok: boolean; aiOnline: boolean }>("/api/health"),
   dashboard: () => request<Dashboard>("/api/learning/dashboard"),
+  learningPaths: () => request<LearningPath[]>("/api/learning-paths"),
+  learningPathModule: (id:number) => request<LearningModuleDetail>(`/api/learning-paths/modules/${id}`),
   topics: () => request<Array<{id:number;slug:string;title:string;titleVi:string;icon:string;color:string;mindmapCount:number}>>("/api/topics"),
   mindmaps: (status="approved") => request<Array<{id:number;topicId:number;title:string;description:string;status:string;source:string;topicTitleVi:string;nodeCount:number}>>(`/api/mindmaps?status=${status}`),
   mindmap: (id: number) => request<Mindmap>(`/api/mindmaps/${id}`),
+  personalMindmapCopy: (id:number) => request<Mindmap>(`/api/mindmaps/${id}/personal-copy`,{method:"POST"}),
   updateNode: (mapId:number,nodeId:number,input:Record<string,unknown>) => request(`/api/mindmaps/${mapId}/nodes/${nodeId}`,{method:"PATCH",body:JSON.stringify(input)}),
-  createSession: (duration:10|20) => request<LearningSession>("/api/learning/sessions",{method:"POST",body:JSON.stringify({duration})}),
+  createSession: (duration:10|20,moduleId?:number) => request<LearningSession>("/api/learning/sessions",{method:"POST",body:JSON.stringify({duration,moduleId})}),
   session: (id:number) => request<LearningSession>(`/api/learning/sessions/${id}`),
   attempt: (sessionId:number,input:Record<string,unknown>) => request(`/api/learning/sessions/${sessionId}/attempts`,{method:"POST",body:JSON.stringify(input)}),
   completeSession: (id:number) => request<LearningSession>(`/api/learning/sessions/${id}/complete`,{method:"POST"}),
@@ -51,6 +62,8 @@ export const api = {
   deleteAgentThread: (threadId:number) => request<void>(`/api/agent/threads/${threadId}`,{method:"DELETE"}),
   generateMindmap: (input:Record<string,unknown>) => request<GeneratedResult>("/api/agent/mindmap-drafts",{method:"POST",body:JSON.stringify(input)}),
   saveGeneratedMindmap: (topicId:number,draft:unknown) => request<Mindmap>("/api/agent/mindmap-drafts/save",{method:"POST",body:JSON.stringify({topicId,draft})}),
+  generateMindmapExtension: (input:{mindmapId:number;instruction:string}) => request<MindmapExtensionResult>("/api/agent/mindmap-extensions",{method:"POST",body:JSON.stringify(input)}),
+  saveMindmapExtension: (mindmapId:number,draft:MindmapExtensionDraft) => request<Mindmap>("/api/agent/mindmap-extensions/save",{method:"POST",body:JSON.stringify({mindmapId,draft})}),
   approveMindmap: (id:number) => request<Mindmap>(`/api/mindmaps/${id}/approve`,{method:"POST"}),
   transcribe: (form:FormData) => request<{text:string}>("/api/speech/transcribe",{method:"POST",body:form}),
   synthesize: (text:string) => request<Blob>("/api/speech/synthesize",{method:"POST",body:JSON.stringify({text})}),
@@ -79,9 +92,16 @@ export const api = {
 export interface LearningItem { id:number;vocabularyId:number;activityType:string;sortOrder:number;isNew:number;term:string;meaningVi:string;ipa:string;cefr:string;status:string;example:string;exampleVi:string; }
 export interface LearningSession { id:number;durationMinutes:10|20;status:"active"|"completed";startedAt:string;completedAt:string|null;summary:string;items:LearningItem[]; }
 export interface Progress extends Dashboard { accuracy30d:number;speakingAttempts7d:number;topicCoverage:number; }
+export interface LearningPathModule {id:number;slug:string;title:string;goalVi:string;cefr:"A1"|"A2"|"B1"|"B2";sortOrder:number;status:"locked"|"active"|"completed";progressPercent:number;mindmapTitle:string|null;totalWords:number;stableWords:number;learningWords:number}
+export interface LearningPath {id:number;slug:string;title:string;level:"A1"|"A2"|"B1"|"B2";description:string;sortOrder:number;modules:LearningPathModule[]}
+export interface LearningModuleDetail extends LearningPathModule {pathId:number;topicSlug:string;mindmap:{id:number;title:string|null}|null}
 export interface GeneratedWord {term:string;meaningVi:string;ipa:string;cefr:string;example:string;exampleVi:string}
 export interface GeneratedBranch {label:string;meaningVi:string;color:"coral"|"amber"|"leaf"|"sky"|"violet";words:GeneratedWord[]}
 export interface GeneratedResult {jobId:number;draft:{title:string;description:string;branches:GeneratedBranch[]};duplicates:Array<{term:string;meaningVi:string}>}
+export interface MindmapExtensionWord {term:string;meaningVi:string;ipa:string;cefr:"A1"|"A2"|"B1"|"B2";example:string;exampleVi:string}
+export interface MindmapExtensionBranch {parentLabel:string;meaningVi:string;color:"coral"|"amber"|"leaf"|"sky"|"violet";words:MindmapExtensionWord[]}
+export interface MindmapExtensionDraft {mindmapTitle:string;branches:MindmapExtensionBranch[]}
+export interface MindmapExtensionResult {jobId:number;draft:MindmapExtensionDraft;duplicates:Array<{term:string;meaningVi:string}>}
 export interface Settings {nineRouterUrl:string;hasNineRouterKey:boolean;models:Record<string,string>;defaultDuration?:number;ttsVoice?:string;}
 export interface NotebookEntry {id:number;vocabularyId:number|null;exampleId:number|null;sentence:string;translationVi:string;sourceType:"quoted"|"user"|"ai";sourceReference:string;fingerprint:string;createdAt:string;updatedAt:string}
 export interface SpeakingSessionItem {id:number;sentenceId:number;sortOrder:number;completedAt:string|null;sentence:string;translationVi:string}
@@ -93,6 +113,12 @@ export interface DocumentDetail extends DocumentSummaryResult {storagePath:strin
 export interface ExtractionCandidate {category:"recommended"|"optional"|"skip";reason:string}
 export interface DocumentExtractionResult {jobId:number;draft:{vocabulary:Array<ExtractionCandidate&{term:string;meaningVi:string}>;sentences:Array<ExtractionCandidate&{sentence:string}>}}
 
+
+export type VocabularyInboxStatus="queued"|"processing"|"ready"|"failed"|"approved"|"dismissed";
+export interface VocabularyExampleDraft {role:"basic"|"daily_life"|"personalized"|"learner";sentence:string;translationVi:string;usageNote:string}
+export interface VocabularyEnrichmentDraft {normalizedTerm:string;displayTerm:string;meaningVi:string;ipa:string;partOfSpeech:string;cefr:"A1"|"A2"|"B1"|"B2";itemType:"word"|"phrase"|"sentence";examples:VocabularyExampleDraft[];placement:{mindmapId:number|null;parentNodeId:number|null;reason:string;newMindmap:{title:string;description:string;branchLabel:string}|null}}
+export interface VocabularyCaptureInput {rawText:string;contextText?:string;sourceType?:"quick_capture"|"agent_chat"|"mindmap";sourceReference?:string;hintMindmapId?:number|null;hintParentNodeId?:number|null}
+export interface VocabularyInboxItem {id:number;userId:number;rawText:string;normalizedText:string;contextText:string;sourceType:string;sourceReference:string;hintMindmapId:number|null;hintParentNodeId:number|null;status:VocabularyInboxStatus;errorMessage:string|null;approvedVocabularyId:number|null;approvedMindmapId:number|null;createdAt:string;updatedAt:string;approvedAt:string|null;draft:VocabularyEnrichmentDraft|null}
 
 export interface AgentThread {id:number;title:string;preview?:string;updatedAt:string;archivedAt?:string|null}
 export interface AgentMessage {id:number;threadId:number;role:"user"|"assistant"|"tool";content:string;status:string;cacheHit:number;createdAt?:string}

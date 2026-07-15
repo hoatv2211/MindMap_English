@@ -103,13 +103,21 @@ Không gửi toàn bộ thư viện mặc định. Chỉ gửi audio hoặc sect
 
 ## 10. AI tutor theo account
 
-- Policy runtime nằm tại `.hermes/skills/mindmap-english-tutor/SKILL.md`; loader chỉ đọc path cố định trong project và có fallback khi file lỗi.
+- Policy runtime nằm tại `docs/ai-skills/mindmap-english-tutor/SKILL.md`; loader chỉ đọc path cố định trong project và có fallback khi file lỗi.
 - Mỗi request tutor nhận learner snapshot giới hạn theo `user_id`, `profile_revision`, skill version và schema version.
 - Chat lưu nhiều thread trong SQLite. User có thể tạo mới, đổi tên, lưu trữ, khôi phục, xóa và retry message lỗi.
 - Câu hỏi kiến thức độc lập có thể dùng response cache. Follow-up, tiến độ cá nhân và retry luôn gọi provider.
 - Không gửi password, recovery code, session token, raw SQL hoặc toàn bộ database tới 9Router.
 
-## 11. VPS
+## 11. Hộp từ mới
+
+- Ba điểm Ghi nhanh, AI Chat và mindmap cùng tạo `vocabulary_inbox_items` theo `user_id`.
+- Chat model trả draft strict JSON: nghĩa, IPA, POS, CEFR, đúng ba role `basic`, `daily_life`, `personalized`, bản dịch Việt và placement.
+- Draft chỉ ghi vào vocabulary, personal examples, mindmap và SRS sau thao tác duyệt. Approval atomic, idempotent và không reset tiến độ SRS cũ.
+- Provider lỗi: item chuyển `failed`, giữ raw note, hiện thông báo đã sanitize, cho phép retry hoặc dismiss.
+- Learner context, candidate mindmap, inbox và example cá nhân luôn giới hạn theo account. Không gửi dữ liệu user khác tới provider.
+
+## 12. VPS
 
 ```dotenv
 HOST=0.0.0.0

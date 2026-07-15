@@ -19,6 +19,16 @@ export const GeneratedMindmapSchema = z.object({
 });
 export type GeneratedMindmap = z.infer<typeof GeneratedMindmapSchema>;
 
+export const MindmapExtensionInputSchema = z.object({mindmapId:z.number().int().positive(),instruction:z.string().min(2).max(1000)});
+export const MindmapExtensionDraftSchema = z.object({
+  mindmapTitle:z.string().min(1).max(120),
+  branches:z.array(z.object({
+    parentLabel:z.string().min(1).max(100),meaningVi:z.string().min(1).max(200),color:z.enum(["coral","amber","leaf","sky","violet"]),
+    words:z.array(z.object({term:z.string().min(1).max(120),meaningVi:z.string().min(1).max(300),ipa:z.string().max(120).default(""),cefr:z.enum(["A1","A2","B1","B2"]),example:z.string().min(1).max(300),exampleVi:z.string().min(1).max(400)})).min(1).max(12),
+  })).min(1).max(8),
+});
+export type MindmapExtensionDraft=z.infer<typeof MindmapExtensionDraftSchema>;
+
 export const DocumentExtractionSchema = z.object({
   vocabulary: z.array(z.object({ term: z.string().min(1), meaningVi: z.string().min(1), category: z.enum(["recommended", "optional", "skip"]), reason: z.string().min(1).max(200) })).max(30),
   sentences: z.array(z.object({ sentence: z.string().min(1), category: z.enum(["recommended", "optional", "skip"]), reason: z.string().min(1).max(200) })).max(20),
@@ -142,6 +152,17 @@ export class AgentToolService {
     return { reply, suggestions: [] };
   }
 
+  async generateMindmapExtensionDraft(input:unknown,userId?:number){
+    const parsed=MindmapExtensionInputSchema.parse(input);const map=this.content.getMindmap(parsed.mindmapId,userId);if(!map)throw new Error("Mindmap not found");
+    const jobId=Number(this.db.prepare("INSERT INTO generation_jobs(job_type,status,request_json,user_id) VALUES ('mindmap-extension','running',?,?)").run(JSON.stringify(parsed),userId??null).lastInsertRowid);
+    try{const draft=await this.client.chatJson(MindmapExtensionDraftSchema,[{role:"system",content:"Extend an existing English mindmap for Vietnamese learners. Return JSON only. Add practical words/phrases, not rare words. Use existing or sensible branch labels. Every word needs Vietnamese meaning, CEFR, short English example, Vietnamese translation."},{role:"user",content:`Mindmap: ${map.title}. Existing nodes: ${map.nodes.map(node=>node.label).join(", ")}. Instruction: ${parsed.instruction}. Return {"mindmapTitle":"${map.title}","branches":[{"parentLabel":"...","meaningVi":"...","color":"coral|amber|leaf|sky|violet","words":[{"term":"...","meaningVi":"...","ipa":"","cefr":"A1|A2|B1|B2","example":"...","exampleVi":"..."}]}]}`}]);this.db.prepare("UPDATE generation_jobs SET status='completed',result_json=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(JSON.stringify(draft),jobId);return{jobId,draft,duplicates:this.findExtensionDuplicates(draft)}}catch(error){this.db.prepare("UPDATE generation_jobs SET status='failed',error=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(error instanceof Error?error.message:"Unknown error",jobId);throw error;}
+  }
+
+  saveMindmapExtensionDraft(mindmapId:number,draft:MindmapExtensionDraft,userId?:number){
+    const parsed=MindmapExtensionDraftSchema.parse(draft);const map=this.content.getMindmap(mindmapId,userId);if(!map)throw new Error("Mindmap not found");
+    return this.content.appendMindmapExtension(mindmapId,parsed,userId);
+  }
+
   async generateDocumentExtractionDraft(documentId: number, sectionIds: number[], text: string, userId?: number) {
     const request = { documentId, sectionIds };
     const jobId = Number(this.db.prepare("INSERT INTO generation_jobs(job_type,status,request_json,user_id) VALUES ('document-extraction','running',?,?)").run(JSON.stringify(request), userId ?? null).lastInsertRowid);
@@ -165,5 +186,11 @@ export class AgentToolService {
     if (!terms.length) return [];
     const placeholders = terms.map(() => "?").join(",");
     return (this.db.prepare(`SELECT term,meaning_vi meaningVi FROM vocabulary WHERE normalized_term IN (${placeholders})`).all(...terms) as Array<{ term: string; meaningVi: string }>);
+  }
+  private findExtensionDuplicates(draft:MindmapExtensionDraft){
+    const terms=draft.branches.flatMap(branch=>branch.words.map(word=>word.term.toLowerCase()));
+    if(!terms.length)return[];
+    const placeholders=terms.map(()=>"?").join(",");
+    return this.db.prepare(`SELECT term,meaning_vi meaningVi FROM vocabulary WHERE normalized_term IN (${placeholders})`).all(...terms) as Array<{term:string;meaningVi:string}>;
   }
 }

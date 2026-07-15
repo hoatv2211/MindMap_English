@@ -8,7 +8,7 @@ const dataPath = path.resolve(".tools", "e2e-data");
 export default async function globalSetup() {
   fs.mkdirSync(path.dirname(statePath), { recursive: true });
   fs.rmSync(dataPath,{recursive:true,force:true});
-  const child = spawn(process.execPath, ["--import", "tsx", "src/server/index.ts"], {
+  const child = spawn(process.execPath, ["--import", "tsx", "tests/e2e/server.ts"], {
     cwd: process.cwd(),
     detached: true,
     stdio: "ignore",

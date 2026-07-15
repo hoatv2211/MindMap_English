@@ -147,8 +147,10 @@ data/
 
 - Đăng ký bằng `username + password`; mỗi tài khoản có dữ liệu học, tài liệu và hội thoại riêng trong SQLite.
 - Recovery code chỉ hiển thị khi đăng ký hoặc khôi phục mật khẩu. User phải tự lưu; code cũ bị vô hiệu sau khi dùng.
-- AI tutor dùng skill `.hermes/skills/mindmap-english-tutor/SKILL.md`, learner context đã giới hạn từ SQLite và lịch sử chat nhiều thread.
+- AI tutor dùng skill `docs/ai-skills/mindmap-english-tutor/SKILL.md`, learner context đã giới hạn từ SQLite và lịch sử chat nhiều thread.
 - Cache chỉ áp dụng cho learner context và câu hỏi kiến thức độc lập; hội thoại nối tiếp luôn gọi AI.
+- **Hộp từ mới:** nhận ghi chú từ Ghi nhanh, AI Chat và nhánh mindmap. AI tạo draft nghĩa, IPA, CEFR, 3 ví dụ song ngữ và đề xuất vị trí; user phải duyệt trước khi ghi vocabulary, mindmap và SRS.
+- Draft lỗi giữ trong inbox để retry hoặc dismiss; AI offline không làm mất ghi chú gốc. Inbox, example cá nhân, mindmap và trạng thái ôn tập được cô lập theo account.
 - Mutation API kiểm tra same-origin, session cookie dùng `HttpOnly` và `SameSite=Lax`.
 
 ### Đóng gói lên VPS

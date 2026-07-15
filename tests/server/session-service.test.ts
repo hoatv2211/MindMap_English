@@ -32,9 +32,21 @@ describe("session composition", () => {
     expect(completed.body.status).toBe("completed");
   });
 
+  it("backfills seed vocabulary for existing accounts before starting a focused module", async () => {
+    const app = createApp({ db });
+    const agent = request.agent(app);
+    await agent.post("/api/auth/register").send({ username: "learner", password: "strong password 123", passwordConfirmation: "strong password 123" }).expect(201);
+    db.prepare("DELETE FROM user_vocabulary_state WHERE user_id=1").run();
+    const paths = await agent.get("/api/learning-paths").expect(200);
+    const moduleId = paths.body[0].modules[0].id;
+    const created = await agent.post("/api/learning/sessions").send({ duration: 10, moduleId }).expect(201);
+    expect(created.body.items.length).toBeGreaterThan(0);
+    expect((db.prepare("SELECT COUNT(*) count FROM user_vocabulary_state WHERE user_id=1").get() as { count:number }).count).toBeGreaterThan(0);
+  });
+
   it("returns dashboard and progress summaries", () => {
     const repository = new LearningRepository(db);
-    expect(repository.getDashboard(false)).toMatchObject({ newCount: 18, streak: 0, aiOnline: false });
+    expect(repository.getDashboard(false)).toMatchObject({ newCount: 66, streak: 0, aiOnline: false });
     expect(repository.getProgress()).toHaveProperty("accuracy30d");
   });
 });

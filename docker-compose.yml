@@ -1,0 +1,25 @@
+services:
+  mindmap-english:
+    image: ghcr.io/hoatv2211/mindmap_english:latest
+    container_name: mindmap-english
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 8787
+      DATA_DIR: /data
+      ALLOW_REMOTE_BINDING: "true"
+      AUTH_SECURE_COOKIES: "false"
+      # Set these when VPS can reach your AI gateway / 9Router.
+      # NINEROUTER_URL: "http://host.docker.internal:20128"
+      # NINEROUTER_KEY: ""
+      # NINEROUTER_CHAT_MODEL: ""
+      # NINEROUTER_STT_MODEL: ""
+      # NINEROUTER_TTS_MODEL: ""
+    volumes:
+      - mindmap_english_data:/data
+
+volumes:
+  mindmap_english_data:

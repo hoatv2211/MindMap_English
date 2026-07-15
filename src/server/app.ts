@@ -22,6 +22,11 @@ import { createDocumentRouter } from "./modules/documents/routes";
 import { AuthService } from "./modules/auth/service";
 import { createAuthRouter } from "./modules/auth/routes";
 import { optionalAuth, requireAuth, requireSameOrigin } from "./modules/auth/middleware";
+import { VocabularyInboxRepository } from "./modules/vocabulary-inbox/repository";
+import { VocabularyEnrichmentService } from "./modules/vocabulary-inbox/enrichment-service";
+import { createVocabularyInboxRouter } from "./modules/vocabulary-inbox/routes";
+import { LearningPathRepository } from "./modules/learning-paths/repository";
+import { createLearningPathRouter } from "./modules/learning-paths/routes";
 
 export interface AppDependencies {
   db: AppDatabase;
@@ -34,9 +39,12 @@ export interface AppDependencies {
 export function createApp({ db, config = loadConfig(), nineRouter, includeNotFound = true, protectApi = process.env.NODE_ENV !== "test" }: AppDependencies) {
   const app = express();
   const content = new ContentRepository(db);
-  const learning = new LearningRepository(db);
+  const learningPaths = new LearningPathRepository(db);
+  const learning = new LearningRepository(db, undefined, learningPaths);
   const client = nineRouter ?? new NineRouterClient(config.nineRouter);
   const agent = new AgentToolService(db, content, learning, client);
+  const vocabularyInbox = new VocabularyInboxRepository(db);
+  const vocabularyEnrichment = new VocabularyEnrichmentService(db, vocabularyInbox, client);
   const backups = new BackupService(db, config);
   const speaking = new SpeakingRepository(db);
   const documents = new DocumentRepository(db, config);
@@ -53,7 +61,9 @@ export function createApp({ db, config = loadConfig(), nineRouter, includeNotFou
   app.use("/api", createLibraryRouter(content));
   app.use("/api/mindmaps", createMindmapRouter(content));
   app.use("/api/learning", createLearningRouter(learning));
-  app.use("/api/agent", createAgentRouter(agent));
+  app.use("/api/learning-paths", createLearningPathRouter(learningPaths));
+  app.use("/api/agent", createAgentRouter(agent, vocabularyInbox, vocabularyEnrichment));
+  app.use("/api/vocabulary-inbox", createVocabularyInboxRouter(vocabularyInbox, vocabularyEnrichment));
   app.use("/api/speech", createSpeechRouter(client));
   app.use("/api/backups", createBackupRouter(backups));
   app.use("/api/settings", createSettingsRouter(db, config, client));
