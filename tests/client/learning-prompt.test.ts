@@ -1,0 +1,10 @@
+import {describe,expect,it} from "vitest";
+import {createLearningPrompt,getLearningHint,isLearningAnswerCorrect} from "../../src/client/lib/learning-prompt";
+const base={id:1,vocabularyId:1,activityType:"meaning-recall",sortOrder:0,isNew:1,term:"ripe",meaningVi:"chín",ipa:"/raɪp/",cefr:"B1",status:"learning",example:"These bananas are ripe.",exampleVi:"Những quả chuối này đã chín."};
+describe("learning prompt",()=>{
+ it("expects English from a Vietnamese meaning prompt",()=>{const model=createLearningPrompt(base);expect(model.expectedLanguage).toBe("en");expect(model.frontPrimary).toBe("chín");expect(model.frontSecondary).not.toContain("ripe");expect(getLearningHint(model,1)).toMatch(/^r/)});
+ it("expects Vietnamese for general recall and preserves diacritics",()=>{const model=createLearningPrompt({...base,activityType:"recall"});expect(model.expectedLanguage).toBe("vi");expect(model.frontPrimary).toBe("ripe");expect(model.frontSecondary).not.toContain("chín");expect(getLearningHint(model,1)).toContain("ch")});
+ it("uses Vietnamese instructions for context answers",()=>{const model=createLearningPrompt({...base,activityType:"context"});expect(model.expectedLanguage).toBe("vi");expect(model.placeholder).toContain("tiếng Việt");expect(model.hintLabel).toBe("Gợi ý tiếng Việt")});
+ it("accepts close Vietnamese meaning answers with missing accents or synonyms",()=>{const model=createLearningPrompt({...base,activityType:"recall",meaningVi:"quả táo, trái táo"});expect(isLearningAnswerCorrect(model,"qua tao")).toBe(true);expect(isLearningAnswerCorrect(model,"trai tao")).toBe(true)});
+ it("accepts English answers despite case punctuation and article differences",()=>{const model=createLearningPrompt({...base,term:"an apple"});expect(isLearningAnswerCorrect(model,"Apple!")).toBe(true);expect(isLearningAnswerCorrect(model,"AN APPLE")).toBe(true)});
+});

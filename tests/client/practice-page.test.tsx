@@ -34,6 +34,24 @@ describe("PracticePage", () => {
     expect(await screen.findByText("Lưu câu đầu tiên để bắt đầu shadowing.")).toBeInTheDocument();
   });
 
+  it("adds a custom practice sentence and offers an AI helper", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/speaking/notebook") && !init?.method) return Response.json([]);
+      if (url.endsWith("/api/speaking/notebook") && init?.method === "POST") return Response.json({ id: 2, sentence: "Could I have the receipt please?", translationVi: "Cho tôi xin hóa đơn được không?", sourceType: "user", sourceReference: "practice-room", fingerprint: "custom", vocabularyId: null, exampleId: null, createdAt: "now", updatedAt: "now" }, { status: 201 });
+      if (url.endsWith("/api/agent/chat")) return Response.json({ reply: "Gợi ý: Could I have the receipt please?", suggestions: [], threadId: 3 });
+      throw new Error(`Unexpected request ${url}`);
+    }));
+    render(<PracticePage />);
+    expect(await screen.findByText("Thêm câu luyện riêng")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Câu tiếng Anh"), "Could I have the receipt please?");
+    await userEvent.type(screen.getByLabelText("Nghĩa tiếng Việt"), "Cho tôi xin hóa đơn được không?");
+    await userEvent.click(screen.getByRole("button", { name: "Thêm vào phòng luyện" }));
+    expect(await screen.findByText("Could I have the receipt please?")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Nhờ AI gợi ý câu" }));
+    expect(await screen.findByText(/Gợi ý:/)).toBeInTheDocument();
+  });
+
   it("keeps manual transcript available when speech provider is offline", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
       const url = String(input);

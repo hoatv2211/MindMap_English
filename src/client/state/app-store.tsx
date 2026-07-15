@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, useState, type PropsWithChildren } from "react";
+import type { VocabularyInboxStatus } from "../api/client";
 
-export type Page = "today" | "library" | "mindmap" | "create" | "learning" | "practice" | "reading" | "progress" | "settings";
+export type Page = "today" | "library" | "mindmap" | "create" | "learning" | "path" | "practice" | "reading" | "progress" | "settings" | "vocabulary-inbox";
 
 interface AppState {
   page: Page;
@@ -17,6 +18,12 @@ interface AppState {
   focusMode: boolean;
   setFocusMode: (focus: boolean) => void;
   mindmapDraftTerm: string;
+  quickCaptureOpen:boolean;
+  vocabularyInboxStatus:VocabularyInboxStatus;
+  quickCaptureHints:{mindmapId?:number;parentNodeId?:number}|null;
+  openQuickCapture:(hints?:{mindmapId?:number;parentNodeId?:number})=>void;
+  closeQuickCapture:()=>void;
+  openVocabularyInbox:(status?:VocabularyInboxStatus)=>void;
   startMindmapDraft: (term: string) => void;
   clearMindmapDraftTerm: () => void;
 }
@@ -31,6 +38,9 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
   const [agentDraft, setAgentDraft] = useState("");
   const [focusMode, setFocusMode] = useState(false);
   const [mindmapDraftTerm, setMindmapDraftTerm] = useState("");
+  const [quickCaptureOpen,setQuickCaptureOpen]=useState(false);
+  const [vocabularyInboxStatus,setVocabularyInboxStatus]=useState<VocabularyInboxStatus>("ready");
+  const [quickCaptureHints,setQuickCaptureHints]=useState<{mindmapId?:number;parentNodeId?:number}|null>(null);
   const value = useMemo(() => ({
     page,
     setPage,
@@ -48,7 +58,11 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
     mindmapDraftTerm,
     startMindmapDraft: (term: string) => { setMindmapDraftTerm(term); setPage("create"); },
     clearMindmapDraftTerm: () => setMindmapDraftTerm(""),
-  }), [page, selectedMindmapId, activeSessionId, agentOpen, agentDraft, focusMode, mindmapDraftTerm]);
+    quickCaptureOpen,quickCaptureHints,vocabularyInboxStatus,
+    openQuickCapture:(hints?:{mindmapId?:number;parentNodeId?:number})=>{setQuickCaptureHints(hints??null);setQuickCaptureOpen(true)},
+    closeQuickCapture:()=>setQuickCaptureOpen(false),
+    openVocabularyInbox:(status:VocabularyInboxStatus="ready")=>{setVocabularyInboxStatus(status==="queued"?"processing":status);setPage("vocabulary-inbox")},
+  }), [page, selectedMindmapId, activeSessionId, agentOpen, agentDraft, focusMode, mindmapDraftTerm, quickCaptureOpen, quickCaptureHints, vocabularyInboxStatus]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 

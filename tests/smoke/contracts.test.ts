@@ -4,6 +4,7 @@ import {
   DocumentHighlightSchema,
   ReviewGradeSchema,
   SpeakingAttemptSchema,
+  VocabularyEnrichmentDraftSchema,
 } from "../../src/shared/contracts";
 
 describe("shared contracts", () => {
@@ -64,4 +65,40 @@ describe("shared contracts", () => {
       textFingerprint: "abc",
     }).sourceType).toBe("quoted");
   });
-});
+
+  it("normalizes a concise AI mindmap title", () => {
+    const draft = VocabularyEnrichmentDraftSchema.parse({
+      normalizedTerm: "developer",
+      displayTerm: "Developer",
+      meaningVi: "lập trình viên",
+      ipa: "/dɪˈveləpər/",
+      partOfSpeech: "noun",
+      cefr: "A2",
+      itemType: "word",
+      examples: [
+        { role: "basic", sentence: "She is a developer.", translationVi: "Cô ấy là lập trình viên.", usageNote: "" },
+        { role: "daily_life", sentence: "We need a developer.", translationVi: "Chúng tôi cần một lập trình viên.", usageNote: "" },
+        { role: "personalized", sentence: "I work as a developer.", translationVi: "Tôi làm lập trình viên.", usageNote: "" },
+      ],
+      placement: { mindmapId: null, parentNodeId: null, reason: "Work", newMindmap: "Work and Company" },
+    });
+
+    expect(draft.placement.newMindmap).toEqual({ title: "Work and Company", description: "", branchLabel: "Vocabulary" });
+  });
+  it("normalizes AI mindmap branch aliases", () => {
+    const draft = VocabularyEnrichmentDraftSchema.parse({
+      normalizedTerm: "developer",
+      displayTerm: "developer",
+      meaningVi: "lập trình viên",
+      cefr: "A2",
+      itemType: "word",
+      examples: [
+        { role: "basic", sentence: "She is a developer.", translationVi: "Cô ấy là lập trình viên." },
+        { role: "daily_life", sentence: "The developer fixed the app.", translationVi: "Lập trình viên sửa ứng dụng." },
+        { role: "personalized", sentence: "I work as a developer.", translationVi: "Tôi làm lập trình viên." },
+      ],
+      placement: { mindmapId: null, parentNodeId: null, newMindmap: { title: "Work Essentials", parentTitle: "Jobs", branch: "company roles" } },
+    });
+
+    expect(draft.placement.newMindmap).toEqual({ title: "Work Essentials", description: "Jobs", branchLabel: "company roles" });
+  });});

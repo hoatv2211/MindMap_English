@@ -17,7 +17,8 @@ describe("content API", () => {
     const topics = await request(app).get("/api/topics").expect(200);
     const maps = await request(app).get("/api/mindmaps").expect(200);
     expect(topics.body).toHaveLength(17);
-    expect(maps.body[0]).toMatchObject({ title: "Eating Essentials", status: "approved" });
+    expect(maps.body).toHaveLength(17);
+    expect(maps.body).toContainEqual(expect.objectContaining({ title: "Eating Essentials", status: "approved" }));
   });
 
   it("loads a map with reusable vocabulary nodes", async () => {

@@ -14,6 +14,7 @@ import "./styles/practice-complete.css";
 import "./styles/reader.css";
 import "./styles/reader-controls.css";
 import "./styles/extraction.css";
+import "./styles/vocabulary-inbox.css";
 
 createRoot(document.getElementById("root")!).render(<StrictMode><App/></StrictMode>);
 
