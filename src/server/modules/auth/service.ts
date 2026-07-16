@@ -3,7 +3,7 @@ import type { AppDatabase } from "../../db/database";
 import { withTransaction } from "../../db/database";
 import { hashSecret, verifySecret } from "./password";
 
-export interface AuthUser { id:number;username:string;profileRevision:number }
+export interface AuthUser { id:number;username:string;profileRevision:number;role:"admin"|"learner";isAdmin:boolean }
 export interface AuthResult { user:AuthUser;sessionToken:string;recoveryCode?:string }
 
 function normalizeUsername(username:string){return username.trim().normalize("NFKC").toLowerCase()}
@@ -25,7 +25,7 @@ export class AuthService{
     const claimLegacy=(this.db.prepare("SELECT COUNT(*) count FROM users").get() as {count:number}).count===0;
     const passwordHash=await hashSecret(input.password);const code=recoveryCode();const codeHash=await hashSecret(code);
     const userId=withTransaction(this.db,()=>{
-      const id=Number(this.db.prepare("INSERT INTO users(username,normalized_username,password_hash) VALUES (?,?,?)").run(username,normalized,passwordHash).lastInsertRowid);
+      const id=Number(this.db.prepare("INSERT INTO users(username,normalized_username,password_hash,role) VALUES (?,?,?,?)").run(username,normalized,passwordHash,claimLegacy?"admin":"learner").lastInsertRowid);
       this.db.prepare("INSERT INTO password_recovery_codes(user_id,code_hash) VALUES (?,?)").run(id,codeHash);
       this.db.prepare("INSERT INTO user_learning_progress(user_id) VALUES (?)").run(id);
       this.db.prepare("INSERT OR IGNORE INTO user_vocabulary_state(user_id,vocabulary_id,status) SELECT DISTINCT ?,n.vocabulary_id,v.status FROM mindmap_nodes n JOIN mindmaps m ON m.id=n.mindmap_id JOIN vocabulary v ON v.id=n.vocabulary_id WHERE m.source='seed' AND n.vocabulary_id IS NOT NULL").run(id);
@@ -57,9 +57,9 @@ export class AuthService{
 
   resolveSession(token:string|undefined):AuthUser|null{
     if(!token)return null;const now=new Date().toISOString();
-    const row=this.db.prepare(`SELECT s.id sessionId,s.expires_at expiresAt,s.absolute_expires_at absoluteExpiresAt,u.id,u.username,u.profile_revision profileRevision FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND u.status='active'`).get(tokenHash(token)) as {sessionId:number;expiresAt:string;absoluteExpiresAt:string;id:number;username:string;profileRevision:number}|undefined;
+    const row=this.db.prepare(`SELECT s.id sessionId,s.expires_at expiresAt,s.absolute_expires_at absoluteExpiresAt,u.id,u.username,u.profile_revision profileRevision,u.role FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND u.status='active'`).get(tokenHash(token)) as {sessionId:number;expiresAt:string;absoluteExpiresAt:string;id:number;username:string;profileRevision:number;role:"admin"|"learner"}|undefined;
     if(!row||row.expiresAt<=now||row.absoluteExpiresAt<=now){if(row)this.db.prepare("DELETE FROM auth_sessions WHERE id=?").run(row.sessionId);return null}
-    const sliding=isoAfter(this.sessionHours);const nextExpiry=sliding<row.absoluteExpiresAt?sliding:row.absoluteExpiresAt;this.db.prepare("UPDATE auth_sessions SET expires_at=?,last_seen_at=? WHERE id=?").run(nextExpiry,now,row.sessionId);return{id:row.id,username:row.username,profileRevision:row.profileRevision};
+    const sliding=isoAfter(this.sessionHours);const nextExpiry=sliding<row.absoluteExpiresAt?sliding:row.absoluteExpiresAt;this.db.prepare("UPDATE auth_sessions SET expires_at=?,last_seen_at=? WHERE id=?").run(nextExpiry,now,row.sessionId);return{id:row.id,username:row.username,profileRevision:row.profileRevision,role:row.role,isAdmin:row.role==="admin"};
   }
 
   logout(token:string|undefined){if(token)this.db.prepare("DELETE FROM auth_sessions WHERE token_hash=?").run(tokenHash(token))}
@@ -79,5 +79,5 @@ export class AuthService{
 
   private assertRateLimit(bucket:string,limit=5){const row=this.db.prepare("SELECT attempts,blocked_until blockedUntil FROM auth_rate_limits WHERE bucket_key=?").get(bucket) as {attempts:number;blockedUntil:string|null}|undefined;if(row?.blockedUntil&&row.blockedUntil>new Date().toISOString())throw new AuthError(429,"RATE_LIMITED","Thử lại sau ít phút");if((row?.attempts??0)>=limit)throw new AuthError(429,"RATE_LIMITED","Thử lại sau ít phút")}
   private recordFailure(bucket:string,limit=5){const now=new Date().toISOString();const blocked=isoAfter(.25);this.db.prepare("INSERT INTO auth_rate_limits(bucket_key,attempts,window_started_at,blocked_until) VALUES (?,1,?,NULL) ON CONFLICT(bucket_key) DO UPDATE SET attempts=attempts+1,blocked_until=CASE WHEN attempts+1>=? THEN ? ELSE blocked_until END").run(bucket,now,limit,blocked)}
-  private createSession(userId:number,username:string):AuthResult{const profileRevision=(this.db.prepare("SELECT profile_revision profileRevision FROM users WHERE id=?").get(userId) as {profileRevision:number}).profileRevision;const token=randomBytes(32).toString("base64url");this.db.prepare("INSERT INTO auth_sessions(user_id,token_hash,expires_at,absolute_expires_at) VALUES (?,?,?,?)").run(userId,tokenHash(token),isoAfter(this.sessionHours),isoAfter(this.absoluteSessionHours));return{user:{id:userId,username,profileRevision},sessionToken:token}}
+  private createSession(userId:number,username:string):AuthResult{const user=this.db.prepare("SELECT profile_revision profileRevision,role FROM users WHERE id=?").get(userId) as {profileRevision:number;role:"admin"|"learner"};const token=randomBytes(32).toString("base64url");this.db.prepare("INSERT INTO auth_sessions(user_id,token_hash,expires_at,absolute_expires_at) VALUES (?,?,?,?)").run(userId,tokenHash(token),isoAfter(this.sessionHours),isoAfter(this.absoluteSessionHours));return{user:{id:userId,username,profileRevision:user.profileRevision,role:user.role,isAdmin:user.role==="admin"},sessionToken:token}}
 }

@@ -1,6 +1,6 @@
 import type { Dashboard, DictionaryLookup, Mindmap } from "../../shared/contracts";
 
-export interface AuthUser { id:number; username:string; profileRevision:number }
+export interface AuthUser { id:number; username:string; profileRevision:number; role?:"admin"|"learner"; isAdmin?:boolean }
 export interface AuthResult { user:AuthUser; recoveryCode:string }
 export const AUTH_UNAUTHORIZED_EVENT = "mindmap-english:unauthorized";
 
@@ -102,7 +102,7 @@ export interface MindmapExtensionWord {term:string;meaningVi:string;ipa:string;c
 export interface MindmapExtensionBranch {parentLabel:string;meaningVi:string;color:"coral"|"amber"|"leaf"|"sky"|"violet";words:MindmapExtensionWord[]}
 export interface MindmapExtensionDraft {mindmapTitle:string;branches:MindmapExtensionBranch[]}
 export interface MindmapExtensionResult {jobId:number;draft:MindmapExtensionDraft;duplicates:Array<{term:string;meaningVi:string}>}
-export interface Settings {nineRouterUrl:string;hasNineRouterKey:boolean;models:Record<string,string>;defaultDuration?:number;ttsVoice?:string;}
+export interface Settings {canManageProviderApi?:boolean;nineRouterUrl?:string;hasNineRouterKey:boolean;models:Record<string,string>;defaultDuration?:number;ttsVoice?:string;}
 export interface NotebookEntry {id:number;vocabularyId:number|null;exampleId:number|null;sentence:string;translationVi:string;sourceType:"quoted"|"user"|"ai";sourceReference:string;fingerprint:string;createdAt:string;updatedAt:string}
 export interface SpeakingSessionItem {id:number;sentenceId:number;sortOrder:number;completedAt:string|null;sentence:string;translationVi:string}
 export interface SpeakingSessionResult {id:number;status:"active"|"completed"|"abandoned";startedAt:string;completedAt:string|null;totalDurationSeconds:number;items:SpeakingSessionItem[]}

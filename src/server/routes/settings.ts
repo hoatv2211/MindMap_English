@@ -7,6 +7,7 @@ import type { AuthenticatedRequest } from "../modules/auth/middleware";
 
 const allowedSettings = new Set(["defaultDuration", "ttsVoice", "chatModel", "imageModel", "sttModel", "ttsModel", "weeklyGoalMinutes"]);
 const SettingsInputSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]));
+const isAdmin = (request: AuthenticatedRequest) => request.auth === undefined || request.auth.isAdmin;
 
 export function createSettingsRouter(db: AppDatabase, config: AppConfig, client: NineRouterClient) {
   const router = Router();
@@ -16,7 +17,8 @@ export function createSettingsRouter(db: AppDatabase, config: AppConfig, client:
       ? db.prepare("SELECT key,value FROM settings").all()
       : db.prepare("SELECT key,value FROM user_settings WHERE user_id=?").all(userId);
     const stored = Object.fromEntries((rows as Array<{key:string;value:string}>).map((row) => [row.key, JSON.parse(row.value)]));
-    response.json({ ...stored, nineRouterUrl: config.nineRouter.url, hasNineRouterKey: Boolean(config.nineRouter.key), models: { chat: config.nineRouter.chatModel, image: config.nineRouter.imageModel, stt: config.nineRouter.sttModel, tts: config.nineRouter.ttsModel, voice: config.nineRouter.ttsVoice } });
+    const canManageProviderApi = isAdmin(request);
+    response.json({ ...stored, canManageProviderApi, ...(canManageProviderApi ? { nineRouterUrl: config.nineRouter.url, hasNineRouterKey: Boolean(config.nineRouter.key), models: { chat: config.nineRouter.chatModel, image: config.nineRouter.imageModel, stt: config.nineRouter.sttModel, tts: config.nineRouter.ttsModel, voice: config.nineRouter.ttsVoice } } : { hasNineRouterKey: false, models: {} }) });
   });
   router.put("/", (request: AuthenticatedRequest, response) => {
     const input = SettingsInputSchema.parse(request.body);
@@ -32,6 +34,9 @@ export function createSettingsRouter(db: AppDatabase, config: AppConfig, client:
     save();
     response.json({ saved: Object.keys(input).filter((key) => allowedSettings.has(key)) });
   });
-  router.get("/health", async (_request, response) => response.json({ nineRouter: await client.health(), configured: { chat: Boolean(config.nineRouter.chatModel), image: Boolean(config.nineRouter.imageModel), stt: Boolean(config.nineRouter.sttModel), tts: Boolean(config.nineRouter.ttsVoice || config.nineRouter.ttsModel) } }));
+  router.get("/health", async (request: AuthenticatedRequest, response) => {
+    if (!isAdmin(request)) return response.status(403).json({ error: "Chỉ admin mới xem cấu hình provider", code: "ADMIN_REQUIRED" });
+    return response.json({ nineRouter: await client.health(), configured: { chat: Boolean(config.nineRouter.chatModel), image: Boolean(config.nineRouter.imageModel), stt: Boolean(config.nineRouter.sttModel), tts: Boolean(config.nineRouter.ttsVoice || config.nineRouter.ttsModel) } });
+  });
   return router;
 }

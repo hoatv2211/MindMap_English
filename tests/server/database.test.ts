@@ -30,6 +30,8 @@ describe("database migration", () => {
     expect(db.pragma("foreign_keys", { simple: true })).toBe(1);
     const mindmapColumns=(db.prepare("PRAGMA table_info(mindmaps)").all() as Array<{name:string}>).map(row=>row.name);
     expect(mindmapColumns).toContain("copied_from_mindmap_id");
+    const userRoleColumn=(db.prepare("PRAGMA table_info(users)").all() as Array<{name:string;dflt_value:string|null}>).find(row=>row.name==="role");
+    expect(userRoleColumn?.dflt_value).toBe("'learner'");
     const copyIndexes=db.prepare("PRAGMA index_list(mindmaps)").all() as Array<{name:string;unique:number}>;
     expect(copyIndexes).toContainEqual(expect.objectContaining({name:"idx_mindmaps_personal_copy",unique:1}));
   });

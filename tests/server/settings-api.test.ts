@@ -13,7 +13,7 @@ afterEach(() => db.close());
 
 describe("settings API", () => {
   it("never returns the API key and persists safe preferences", async () => {
-    const config=loadConfig({ NINEROUTER_KEY:"top-secret",NINEROUTER_CHAT_MODEL:"combo/chat" });
+    const config=loadConfig({ PROVIDER_API_KEY:"top-secret",PROVIDER_API_CHAT_MODEL:"combo/chat" });
     const nineRouter={ health:vi.fn(async()=>true) };
     const app=createApp({db,config,nineRouter:nineRouter as never});
     await request(app).put("/api/settings").send({defaultDuration:10,apiKey:"leak"}).expect(200);
@@ -21,6 +21,24 @@ describe("settings API", () => {
     expect(response.body.hasNineRouterKey).toBe(true);
     expect(JSON.stringify(response.body)).not.toContain("top-secret");
     expect(JSON.stringify(response.body)).not.toContain("leak");
+  });
+  it("only exposes provider configuration to the admin account", async () => {
+    const config=loadConfig({ PROVIDER_API_URL:"http://provider.test:20128",PROVIDER_API_KEY:"top-secret",PROVIDER_API_CHAT_MODEL:"combo/chat",PROVIDER_API_STT_MODEL:"combo/stt",PROVIDER_API_TTS_VOICE:"alloy" });
+    const protectedApp=createApp({db,config,nineRouter:{health:vi.fn(async()=>true)} as never,protectApi:true});
+    const admin=request.agent(protectedApp);
+    const learner=request.agent(protectedApp);
+    await admin.post("/api/auth/register").send({username:"admin-one",password:"strong password 123",passwordConfirmation:"strong password 123"}).expect(201);
+    await learner.post("/api/auth/register").send({username:"learner-two",password:"strong password 123",passwordConfirmation:"strong password 123"}).expect(201);
+
+    const adminSettings=await admin.get("/api/settings").expect(200);
+    expect(adminSettings.body).toMatchObject({canManageProviderApi:true,nineRouterUrl:"http://provider.test:20128",hasNineRouterKey:true,models:{chat:"combo/chat",stt:"combo/stt",voice:"alloy"}});
+    const learnerSettings=await learner.get("/api/settings").expect(200);
+    expect(learnerSettings.body).toMatchObject({canManageProviderApi:false,hasNineRouterKey:false,models:{}});
+    expect(JSON.stringify(learnerSettings.body)).not.toContain("provider.test");
+    expect(JSON.stringify(learnerSettings.body)).not.toContain("combo/chat");
+    expect(JSON.stringify(learnerSettings.body)).not.toContain("top-secret");
+    await learner.get("/api/settings/health").expect(403);
+    await admin.get("/api/settings/health").expect(200);
   });
   it("isolates preferences between authenticated users", async () => {
     const config=loadConfig();

@@ -45,4 +45,20 @@ describe("learning paths API", () => {
     const module = updated.body[0].modules.find((item: { id:number }) => item.id === moduleId);
     expect(module.progressPercent).toBeGreaterThan(0);
   });
+
+  it("unlocks the next module when the previous module reaches 100%", async () => {
+    const app = createApp({ db });
+    const agent = request.agent(app);
+    await agent.post("/api/auth/register").send({ username: "unlocker", password: "strong password 123", passwordConfirmation: "strong password 123" }).expect(201);
+    const paths = await agent.get("/api/learning-paths").expect(200);
+    const firstModule = paths.body[0].modules[0];
+    const secondModule = paths.body[0].modules[1];
+    expect(secondModule.status).toBe("locked");
+    const totalItems = firstModule.totalWords;
+    db.prepare("INSERT INTO user_module_progress(user_id,module_id,status,completed_items,total_items) VALUES (?,?,?,?,?)").run(1, firstModule.id, "completed", totalItems, totalItems);
+
+    const updated = await agent.get("/api/learning-paths").expect(200);
+    expect(updated.body[0].modules[0]).toMatchObject({ status: "completed", progressPercent: 100 });
+    expect(updated.body[0].modules[1]).toMatchObject({ id: secondModule.id, status: "active" });
+  });
 });

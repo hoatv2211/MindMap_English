@@ -12,12 +12,12 @@ services:
       DATA_DIR: /data
       ALLOW_REMOTE_BINDING: "true"
       AUTH_SECURE_COOKIES: "false"
-      # Set these when VPS can reach your AI gateway / 9Router.
-      # NINEROUTER_URL: "http://host.docker.internal:20128"
-      # NINEROUTER_KEY: ""
-      # NINEROUTER_CHAT_MODEL: ""
-      # NINEROUTER_STT_MODEL: ""
-      # NINEROUTER_TTS_MODEL: ""
+      # Set these when the container can reach your provider API.
+      # PROVIDER_API_URL: "http://host.docker.internal:20128"
+      # PROVIDER_API_KEY: ""
+      # PROVIDER_API_CHAT_MODEL: ""
+      # PROVIDER_API_STT_MODEL: ""
+      # PROVIDER_API_TTS_MODEL: ""
     volumes:
       - mindmap_english_data:/data
 
