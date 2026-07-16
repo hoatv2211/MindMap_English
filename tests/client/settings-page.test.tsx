@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsPage } from "../../src/client/pages/SettingsPage";
 import { api } from "../../src/client/api/client";
 
-vi.mock("../../src/client/api/client",async(importOriginal)=>{const original=await importOriginal<typeof import("../../src/client/api/client")>();return{...original,api:{...original.api,settings:vi.fn(),backups:vi.fn(),settingsHealth:vi.fn(),saveSettings:vi.fn(),createBackup:vi.fn(),restoreBackup:vi.fn()}}});
+vi.mock("../../src/client/api/client",async(importOriginal)=>{const original=await importOriginal<typeof import("../../src/client/api/client")>();return{...original,api:{...original.api,settings:vi.fn(),backups:vi.fn(),settingsHealth:vi.fn(),saveSettings:vi.fn(),createBackup:vi.fn(),restoreBackup:vi.fn(),deleteBackup:vi.fn()}}});
 afterEach(cleanup);
-beforeEach(()=>{vi.clearAllMocks();vi.mocked(api.backups).mockResolvedValue([]);vi.mocked(api.settingsHealth).mockResolvedValue({nineRouter:true,configured:{chat:true,image:false,stt:true,tts:true}});vi.mocked(api.saveSettings).mockResolvedValue({saved:["defaultDuration"]});vi.mocked(api.createBackup).mockResolvedValue({} as never);vi.mocked(api.restoreBackup).mockResolvedValue({} as never)});
+beforeEach(()=>{vi.clearAllMocks();vi.unstubAllGlobals();vi.mocked(api.backups).mockResolvedValue([]);vi.mocked(api.settingsHealth).mockResolvedValue({nineRouter:true,configured:{chat:true,image:false,stt:true,tts:true}});vi.mocked(api.saveSettings).mockResolvedValue({saved:["defaultDuration"]});vi.mocked(api.createBackup).mockResolvedValue({} as never);vi.mocked(api.restoreBackup).mockResolvedValue({} as never);vi.mocked(api.deleteBackup).mockResolvedValue({} as never)});
 
 describe("SettingsPage",()=>{
   it("hides provider configuration from non-admin users",async()=>{
@@ -25,5 +26,15 @@ describe("SettingsPage",()=>{
     expect(screen.getByText("combo/chat")).toBeInTheDocument();
     expect(screen.getByText("combo/stt / alloy")).toBeInTheDocument();
     expect(screen.getByRole("button",{name:/Kiểm tra kết nối/})).toBeInTheDocument();
+  });
+  it("deletes a local backup after confirmation",async()=>{
+    vi.stubGlobal("confirm",vi.fn(()=>true));
+    vi.mocked(api.settings).mockResolvedValue({canManageProviderApi:false,hasNineRouterKey:false,models:{},defaultDuration:20});
+    vi.mocked(api.backups).mockResolvedValueOnce([{id:11,filename:"backup-test.zip",sizeBytes:45*1024,createdAt:"2026-07-16T08:15:48.763Z"}]).mockResolvedValueOnce([]);
+    render(<SettingsPage/>);
+    expect(await screen.findByText("backup-test.zip")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button",{name:/Xóa backup-test.zip/}));
+    expect(api.deleteBackup).toHaveBeenCalledWith(11);
+    expect(await screen.findByText("Đã xóa backup.")).toBeInTheDocument();
   });
 });

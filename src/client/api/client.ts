@@ -47,6 +47,8 @@ export const api = {
   mindmap: (id: number) => request<Mindmap>(`/api/mindmaps/${id}`),
   personalMindmapCopy: (id:number) => request<Mindmap>(`/api/mindmaps/${id}/personal-copy`,{method:"POST"}),
   updateNode: (mapId:number,nodeId:number,input:Record<string,unknown>) => request(`/api/mindmaps/${mapId}/nodes/${nodeId}`,{method:"PATCH",body:JSON.stringify(input)}),
+  createNodeImage: (mapId:number,nodeId:number) => request<VocabularyImageJob>(`/api/mindmaps/${mapId}/nodes/${nodeId}/image`,{method:"POST"}),
+  nodeImageStatus: (mapId:number,nodeId:number) => request<VocabularyImageJob>(`/api/mindmaps/${mapId}/nodes/${nodeId}/image`),
   createSession: (duration:10|20,moduleId?:number) => request<LearningSession>("/api/learning/sessions",{method:"POST",body:JSON.stringify({duration,moduleId})}),
   session: (id:number) => request<LearningSession>(`/api/learning/sessions/${id}`),
   attempt: (sessionId:number,input:Record<string,unknown>) => request(`/api/learning/sessions/${sessionId}/attempts`,{method:"POST",body:JSON.stringify(input)}),
@@ -76,6 +78,7 @@ export const api = {
   backups: () => request<Array<{id:number;filename:string;sizeBytes:number;createdAt:string}>>("/api/backups"),
   createBackup: () => request("/api/backups",{method:"POST"}),
   restoreBackup: (id:number) => request(`/api/backups/${id}/restore`,{method:"POST"}),
+  deleteBackup: (id:number) => request(`/api/backups/${id}`,{method:"DELETE"}),
   dictionaryLookup: (term:string) => request<DictionaryLookup>(`/api/dictionary/lookup?term=${encodeURIComponent(term)}`),
   dictionaryComplete: (prefix:string) => request<{items:string[]}>(`/api/dictionary/complete?prefix=${encodeURIComponent(prefix)}`),
   speakingNotebook: () => request<NotebookEntry[]>("/api/speaking/notebook"),
@@ -93,6 +96,7 @@ export const api = {
 };
 
 export interface LearningItem { id:number;vocabularyId:number;activityType:string;sortOrder:number;isNew:number;term:string;meaningVi:string;ipa:string;cefr:string;status:string;example:string;exampleVi:string; }
+export interface VocabularyImageJob {jobId:number|null;status:"idle"|"running"|"failed"|"completed";imageUrl:string|null;error:string|null}
 export interface LearningSession { id:number;durationMinutes:10|20;status:"active"|"completed";startedAt:string;completedAt:string|null;summary:string;items:LearningItem[]; }
 export interface Progress extends Dashboard { accuracy30d:number;speakingAttempts7d:number;topicCoverage:number; }
 export interface LearningPathModule {id:number;slug:string;title:string;goalVi:string;cefr:"A1"|"A2"|"B1"|"B2";sortOrder:number;status:"locked"|"active"|"completed";progressPercent:number;mindmapTitle:string|null;totalWords:number;stableWords:number;learningWords:number}

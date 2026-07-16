@@ -22,7 +22,7 @@ export function AppShell({ children }: PropsWithChildren) {
   useEffect(()=>{const handler=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(event.key.toLowerCase()==="n"&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&target?.tagName!=="INPUT"&&target?.tagName!=="TEXTAREA"&&target?.getAttribute("contenteditable")!=="true")openQuickCapture()};window.addEventListener("keydown",handler);return()=>window.removeEventListener("keydown",handler)},[openQuickCapture]);
   return <div className={`app-shell ${focusMode ? "is-focus" : ""}`}>
     <aside className="sidebar" aria-label="Điều hướng chính">
-      <button className="brand" onClick={() => setPage("today")} aria-label="Về trang Hôm nay"><span className="brand-mark"><Sparkles size={19}/></span><span>MindMap<br/><b>English</b></span></button>
+      <button className="brand" onClick={() => setPage("today")} aria-label="Về trang Hôm nay"><img className="brand-mark" src={`${import.meta.env.BASE_URL}icon.svg`} alt=""/><span>MindMap<br/><b>English</b></span></button>
       <nav>{nav.map(({ page: target, label, icon: Icon }) => <button key={target} className={page === target ? "active" : ""} onClick={() => setPage(target)}><Icon size={20}/><span>{label}</span>{target==="vocabulary-inbox"&&pendingVocabularyCount>0&&<b className="nav-badge" aria-label={`${pendingVocabularyCount} từ chờ duyệt`}>{pendingVocabularyCount}</b>}</button>)}</nav>
       <div className="sidebar-footer"><button className="settings-link" onClick={() => setPage("settings")}><Settings size={20}/><span>Cài đặt</span></button><AccountMenu/></div></aside>
     <main className="main-stage">{children}</main>

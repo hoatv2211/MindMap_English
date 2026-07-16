@@ -1,1 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" rx="32" fill="#282622"/><path d="M64 64C47 38 25 39 20 56c-5 18 16 31 44 8Zm0 0c17-26 39-25 44-8 5 18-16 31-44 8Zm0 0c-8 31-2 50 15 48 18-3 20-27-15-48Z" fill="#e9a23b"/><circle cx="64" cy="64" r="12" fill="#f5efe5"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">MindMap English logo</title>
+  <desc id="desc">Rounded dark app icon with connected mindmap nodes forming letter M and a small English word card.</desc>
+  <defs>
+    <linearGradient id="bg" x1="16" y1="12" x2="112" y2="116" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#34312b"/>
+      <stop offset="1" stop-color="#1f1d19"/>
+    </linearGradient>
+    <linearGradient id="warm" x1="26" y1="24" x2="103" y2="101" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f4b64e"/>
+      <stop offset="0.52" stop-color="#e76f51"/>
+      <stop offset="1" stop-color="#8b72b5"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#000000" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+  <rect width="128" height="128" rx="30" fill="url(#bg)"/>
+  <path d="M28 82 C38 56 48 46 64 66 C80 46 91 56 100 82" fill="none" stroke="url(#warm)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" filter="url(#shadow)"/>
+  <path d="M64 66 V34" fill="none" stroke="#f5efe5" stroke-width="8" stroke-linecap="round" opacity="0.96"/>
+  <path d="M38 53 L64 66 L90 53" fill="none" stroke="#f5efe5" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.78"/>
+  <g filter="url(#shadow)">
+    <circle cx="64" cy="34" r="15" fill="#f5efe5"/>
+    <circle cx="28" cy="82" r="14" fill="#e9a23b"/>
+    <circle cx="64" cy="66" r="15" fill="#e76f51"/>
+    <circle cx="100" cy="82" r="14" fill="#8b72b5"/>
+  </g>
+  <path d="M58 78 H93 C99 78 103 82 103 88 V97 C103 103 99 107 93 107 H58 C52 107 48 103 48 97 V88 C48 82 52 78 58 78 Z" fill="#fbf7ef" filter="url(#shadow)"/>
+  <path d="M59 91 H81" stroke="#282622" stroke-width="5" stroke-linecap="round"/>
+  <path d="M59 99 H73" stroke="#5c9b6b" stroke-width="4" stroke-linecap="round"/>
+</svg>

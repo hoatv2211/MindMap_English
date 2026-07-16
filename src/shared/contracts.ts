@@ -44,6 +44,7 @@ export const MindmapNodeSchema = z.object({
   x: z.number(),
   y: z.number(),
   status: LearningStatusSchema.default("new"),
+  imageUrl: z.string().nullable().default(null),
 });
 export type MindmapNode = z.infer<typeof MindmapNodeSchema>;
 

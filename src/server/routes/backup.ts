@@ -11,5 +11,8 @@ export function createBackupRouter(service: BackupService) {
   router.post("/:id/restore", (request, response, next) => {
     try { response.status(202).json(service.stageRestore(Number(request.params.id), (request as AuthenticatedRequest).auth?.id)); } catch (error) { next(error); }
   });
+  router.delete("/:id", (request, response, next) => {
+    try { response.json(service.deleteBackup(Number(request.params.id), (request as AuthenticatedRequest).auth?.id)); } catch (error) { next(error); }
+  });
   return router;
 }

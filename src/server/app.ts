@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 import type { AppDatabase } from "./db/database";
 import { loadConfig, type AppConfig } from "./config";
 import { ContentRepository } from "./modules/content/repository";
+import { VocabularyImageService } from "./modules/content/image-service";
 import { LearningRepository } from "./modules/learning/repository";
 import { NineRouterClient, NineRouterError } from "./modules/agent/ninerouter-client";
 import { AgentToolService } from "./modules/agent/tool-service";
@@ -42,6 +43,7 @@ export function createApp({ db, config = loadConfig(), nineRouter, includeNotFou
   const learningPaths = new LearningPathRepository(db);
   const learning = new LearningRepository(db, undefined, learningPaths);
   const client = nineRouter ?? new NineRouterClient(config.nineRouter);
+  const images = new VocabularyImageService(db, config, client);
   const agent = new AgentToolService(db, content, learning, client);
   const vocabularyInbox = new VocabularyInboxRepository(db);
   const vocabularyEnrichment = new VocabularyEnrichmentService(db, vocabularyInbox, client);
@@ -58,9 +60,10 @@ export function createApp({ db, config = loadConfig(), nineRouter, includeNotFou
   app.use("/api", requireSameOrigin(config.appOrigin));
   app.use("/api/auth", createAuthRouter(auth, config.auth.secureCookies, config.auth.absoluteSessionHours, config.auth.cookieSameSite ?? "lax"));
   app.get("/api/health", async (_request, response) => response.json({ ok: true, aiOnline: await client.health(), ...agent.getTutorStatus() }));
+  app.use("/media", express.static(config.mediaDir));
   if (protectApi) app.use("/api", requireAuth);
   app.use("/api", createLibraryRouter(content));
-  app.use("/api/mindmaps", createMindmapRouter(content));
+  app.use("/api/mindmaps", createMindmapRouter(content, images));
   app.use("/api/learning", createLearningRouter(learning));
   app.use("/api/learning-paths", createLearningPathRouter(learningPaths));
   app.use("/api/agent", createAgentRouter(agent, vocabularyInbox, vocabularyEnrichment));

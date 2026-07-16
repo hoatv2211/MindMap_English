@@ -50,4 +50,21 @@ describe("content API", () => {
     const updated = await request(app).patch(`/api/mindmaps/1/nodes/${apple.id}`).send({ label: "green apple", x: 321 }).expect(200);
     expect(updated.body).toMatchObject({ label: "green apple", x: 321 });
   });
+
+  it("queues vocabulary image generation and serves the completed media", async () => {
+    const imageBytes = Buffer.from("fake png bytes");
+    const nineRouter = { health: async () => true, generateImage: async () => ({ buffer: imageBytes, mimeType: "image/png" }) };
+    const app = createApp({ db, nineRouter: nineRouter as never, protectApi: false });
+    const map = await request(app).get("/api/mindmaps/1").expect(200);
+    const apple = map.body.nodes.find((node: { label: string }) => node.label === "apple");
+
+    const queued = await request(app).post(`/api/mindmaps/1/nodes/${apple.id}/image`).expect(202);
+    expect(queued.body).toMatchObject({ status: "running" });
+    const completed = await request(app).get(`/api/mindmaps/1/nodes/${apple.id}/image`).expect(200);
+    expect(completed.body).toMatchObject({ status: "completed" });
+    expect(completed.body.imageUrl).toMatch(/^\/media\/vocabulary\//);
+    const refreshed = await request(app).get("/api/mindmaps/1").expect(200);
+    expect(refreshed.body.nodes.find((node: { id:number }) => node.id === apple.id).imageUrl).toBe(completed.body.imageUrl);
+    await request(app).get(completed.body.imageUrl).expect(200).expect("Content-Type", /image\/png/).expect(imageBytes);
+  });
 });

@@ -51,6 +51,7 @@ interface NodeRow {
   node_type: "root" | "branch" | "vocabulary"; label: string; meaning_vi: string;
   ipa: string; color: "coral" | "amber" | "leaf" | "sky" | "violet";
   position_x: number; position_y: number; vocabulary_status: "new" | "learning" | "weak" | "stable" | null;
+  image_url: string | null;
 }
 
 export class ContentRepository {
@@ -122,7 +123,7 @@ export class ContentRepository {
     const map = this.db.prepare(`SELECT * FROM mindmaps WHERE id=? AND status!='trashed' ${userId === undefined ? "" : "AND (source='seed' OR user_id=?)"}`).get(...(userId === undefined ? [id] : [id, userId])) as MindmapRow | undefined;
     if (!map) return null;
     const rows = this.db.prepare(`
-      SELECT n.*, v.status vocabulary_status FROM mindmap_nodes n
+      SELECT n.*, v.status vocabulary_status, v.image_url FROM mindmap_nodes n
       LEFT JOIN vocabulary v ON v.id=n.vocabulary_id
       WHERE n.mindmap_id=? ORDER BY n.sort_order, n.id
     `).all(id) as NodeRow[];
@@ -131,6 +132,7 @@ export class ContentRepository {
       nodeType: row.node_type, label: row.label, meaningVi: row.meaning_vi,
       ipa: row.ipa, color: row.color, x: row.position_x, y: row.position_y,
       status: row.vocabulary_status ?? "new",
+      imageUrl: row.image_url ?? null,
     }));
     return { id: map.id, topicId: map.topic_id, title: map.title, description: map.description, status: map.status, source: map.source, nodes };
   }

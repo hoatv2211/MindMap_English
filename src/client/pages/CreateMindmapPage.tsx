@@ -14,7 +14,6 @@ export function CreateMindmapPage() {
   const [savedId, setSavedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [unconfirmedWords, setUnconfirmedWords] = useState<Set<string>>(() => new Set());
 
   useEffect(() => { void api.topics().then(setTopics); }, []);
   useEffect(() => {
@@ -48,7 +47,6 @@ export function CreateMindmapPage() {
 
   const save = async () => {
     if (!result) return;
-    if (unconfirmedWords.size) { setError("Xác nhận các từ cần kiểm tra trước khi lưu bản nháp."); return; }
     const map = await api.saveGeneratedMindmap(topicId, result.draft);
     setSavedId(map.id);
   };
@@ -76,7 +74,7 @@ export function CreateMindmapPage() {
           <div className="branch-preview">{result.draft.branches.map((branch, branchIndex) => <article className={branch.color} key={branch.label}>
             <h3>{branch.label}<small>{branch.meaningVi}</small></h3>
             {branch.words.map((word, wordIndex) => <div key={`${branch.label}-${wordIndex}`}>
-              <DictionaryInput value={word.term} onChange={(term) => updateWordTerm(branchIndex, wordIndex, term)} onUnknownChange={(unconfirmed) => setUnconfirmedWords((current) => { const next = new Set(current); const key = `${branchIndex}:${wordIndex}`; if (unconfirmed) next.add(key); else next.delete(key); return next; })} ariaLabel={`Từ tiếng Anh ${wordIndex + 1}`}/>
+              <DictionaryInput value={word.term} onChange={(term) => updateWordTerm(branchIndex, wordIndex, term)} ariaLabel={`Từ tiếng Anh ${wordIndex + 1}`}/>
               <span>{word.ipa}</span><p>{word.meaningVi}</p><blockquote>{word.example}</blockquote>
             </div>)}
           </article>)}</div>

@@ -85,4 +85,23 @@ describe("BackupService", () => {
     restored.close();
   });
 
+  it("deletes only backups owned by the current user", async () => {
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "mindmap-backup-delete-")); dirs.push(dataDir);
+    const config = loadConfig({ DATA_DIR: dataDir });
+    const db = createDatabase(config.databasePath); migrate(db);
+    db.prepare("INSERT INTO users(id,username,normalized_username,password_hash) VALUES (1,'one','one','hash-one')").run();
+    db.prepare("INSERT INTO users(id,username,normalized_username,password_hash) VALUES (2,'two','two','hash-two')").run();
+    const service = new BackupService(db, config);
+    const mine = await service.createBackup(1);
+    const other = await service.createBackup(2);
+
+    expect(service.deleteBackup(mine.id, 1)).toEqual({ deleted: true });
+    expect(fs.existsSync(path.join(config.backupDir, mine.filename))).toBe(false);
+    expect(service.listBackups(1)).toEqual([]);
+    expect(service.listBackups(2).map(item => item.id)).toEqual([other.id]);
+    expect(() => service.deleteBackup(other.id, 1)).toThrow("Backup not found");
+    expect(fs.existsSync(path.join(config.backupDir, other.filename))).toBe(true);
+    db.close();
+  });
+
 });

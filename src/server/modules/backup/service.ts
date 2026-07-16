@@ -39,6 +39,19 @@ export class BackupService {
     return (rows as Array<{id:number;filename:string;sizeBytes:number;createdAt:string}>).filter((item) => fs.existsSync(path.join(this.config.backupDir, item.filename)));
   }
 
+  deleteBackup(id: number, userId?: number) {
+    const row = (userId === undefined
+      ? this.db.prepare("SELECT filename FROM backups WHERE id=?").get(id)
+      : this.db.prepare("SELECT filename FROM backups WHERE id=? AND user_id=?").get(id, userId)) as { filename: string } | undefined;
+    if (!row) throw new Error("Backup not found");
+    const backupRoot = path.resolve(this.config.backupDir);
+    const zipPath = path.resolve(backupRoot, row.filename);
+    if (!zipPath.startsWith(backupRoot + path.sep)) throw new Error("Unsafe backup path");
+    fs.rmSync(zipPath, { force: true });
+    this.db.prepare("DELETE FROM backups WHERE id=?").run(id);
+    return { deleted: true };
+  }
+
   stageRestore(id: number, userId?: number) {
     const row = (userId === undefined
       ? this.db.prepare("SELECT filename FROM backups WHERE id=?").get(id)

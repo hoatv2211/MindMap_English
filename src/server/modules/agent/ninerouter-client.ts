@@ -79,13 +79,21 @@ export class NineRouterClient {
     catch { throw new NineRouterError("9Router returned invalid structured JSON", "INVALID_RESPONSE", 502); }
   }
 
-  async generateImage(prompt: string): Promise<{ url?: string; base64?: string }> {
+  async generateImage(prompt: string): Promise<{ buffer: Buffer; mimeType: string }> {
     if (!this.config.imageModel) throw new NineRouterError("Image model is not configured", "CONFIG", 400);
     const response = await this.request("/v1/images/generations", {
-      method: "POST", headers: this.headers(), body: JSON.stringify({ model: this.config.imageModel, prompt, n: 1, size: "1024x1024", response_format: "url" }),
+      method: "POST", headers: this.headers(), body: JSON.stringify({ model: this.config.imageModel, prompt, n: 1, size: "1024x1024", response_format: "b64_json" }),
     }, 90_000);
+    const contentType = response.headers.get("content-type") ?? "";
+    if (contentType.startsWith("image/")) return { buffer: Buffer.from(await response.arrayBuffer()), mimeType: contentType };
     const image = ImageResponseSchema.parse(await response.json()).data[0];
-    return { url: image.url, base64: image.b64_json };
+    if (image.b64_json) return { buffer: Buffer.from(image.b64_json, "base64"), mimeType: "image/png" };
+    if (image.url) {
+      const imageResponse = await this.fetchImpl(image.url);
+      if (!imageResponse.ok) throw new NineRouterError(`Image download ${imageResponse.status}`, "UPSTREAM", imageResponse.status);
+      return { buffer: Buffer.from(await imageResponse.arrayBuffer()), mimeType: imageResponse.headers.get("content-type") || "image/png" };
+    }
+    throw new NineRouterError("9Router returned an empty image response", "INVALID_RESPONSE", 502);
   }
 
   async transcribe(buffer: Buffer, filename: string, mimeType: string): Promise<string> {
