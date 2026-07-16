@@ -19,8 +19,7 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev \
-  && npm install --omit=dev --no-save tsx@4.23.1 \
+RUN npm ci --include=dev \
   && npm rebuild better-sqlite3
 COPY --from=build /app/dist ./dist
 COPY src ./src
