@@ -26,11 +26,26 @@ export function requireAuth(request: AuthenticatedRequest, response: Response, n
   next();
 }
 
-export function requireSameOrigin(request: Request, response: Response, next: NextFunction) {
+export function allowCors(appOrigin?: string) {
+  return (request: Request, response: Response, next: NextFunction) => {
+    if (!appOrigin || request.get("origin") !== appOrigin) return next();
+    response.setHeader("Access-Control-Allow-Origin", appOrigin);
+    response.setHeader("Access-Control-Allow-Credentials", "true");
+    response.setHeader("Vary", "Origin");
+    response.setHeader("Access-Control-Allow-Headers", request.get("access-control-request-headers") || "content-type");
+    response.setHeader("Access-Control-Allow-Methods", "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS");
+    if (request.method === "OPTIONS") return response.status(204).send();
+    next();
+  };
+}
+
+export function requireSameOrigin(appOrigin?: string) {
+  return (request: Request, response: Response, next: NextFunction) => {
   if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return next();
   const fetchSite = request.get("sec-fetch-site");
-  if (fetchSite === "cross-site") return response.status(403).json({ error: "Nguồn yêu cầu không hợp lệ", code: "CROSS_SITE_REQUEST" });
   const origin = request.get("origin");
+  if (appOrigin && origin === appOrigin) return next();
+  if (fetchSite === "cross-site") return response.status(403).json({ error: "Nguồn yêu cầu không hợp lệ", code: "CROSS_SITE_REQUEST" });
   if (!origin) return next();
   try {
     if (new URL(origin).host !== request.get("host")) return response.status(403).json({ error: "Nguồn yêu cầu không hợp lệ", code: "CROSS_SITE_REQUEST" });
@@ -38,4 +53,5 @@ export function requireSameOrigin(request: Request, response: Response, next: Ne
     return response.status(403).json({ error: "Nguồn yêu cầu không hợp lệ", code: "CROSS_SITE_REQUEST" });
   }
   next();
+  };
 }

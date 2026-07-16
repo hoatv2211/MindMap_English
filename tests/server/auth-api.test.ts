@@ -12,8 +12,8 @@ afterEach(() => db.close());
 
 function app() {
   return createApp({ db, config: {
-    host: "127.0.0.1", allowRemoteBinding:false, port: 8787, dataDir: ".", databasePath: ":memory:", mediaDir: ".", backupDir: ".",
-    auth: { secureCookies: false, sessionHours: 24, absoluteSessionHours: 168 },
+    host: "127.0.0.1", allowRemoteBinding:false, port: 8787, appOrigin: undefined, dataDir: ".", databasePath: ":memory:", mediaDir: ".", backupDir: ".",
+    auth: { secureCookies: false, cookieSameSite: "lax", sessionHours: 24, absoluteSessionHours: 168 },
     nineRouter: { url: "http://localhost:20128", key: "", chatModel: "", imageModel: "", sttModel: "", ttsModel: "", ttsVoice: "" },
   }, nineRouter: { health: async () => false } as never });
 }
@@ -76,7 +76,7 @@ describe("auth API", () => {
     expect(missing.body).toEqual(wrong.body);
   });
   it("protects application APIs when production gate is enabled", async () => {
-    const protectedApp=createApp({db,config:{host:"127.0.0.1",allowRemoteBinding:false,port:8787,dataDir:".",databasePath:":memory:",mediaDir:".",backupDir:".",auth:{secureCookies:false,sessionHours:24,absoluteSessionHours:168},nineRouter:{url:"http://localhost:20128",key:"",chatModel:"",imageModel:"",sttModel:"",ttsModel:"",ttsVoice:""}},nineRouter:{health:async()=>false} as never,protectApi:true});
+    const protectedApp=createApp({db,config:{host:"127.0.0.1",allowRemoteBinding:false,port:8787,appOrigin:undefined,dataDir:".",databasePath:":memory:",mediaDir:".",backupDir:".",auth:{secureCookies:false,cookieSameSite:"lax",sessionHours:24,absoluteSessionHours:168},nineRouter:{url:"http://localhost:20128",key:"",chatModel:"",imageModel:"",sttModel:"",ttsModel:"",ttsVoice:""}},nineRouter:{health:async()=>false} as never,protectApi:true});
     expect((await request(protectedApp).get("/api/learning/dashboard")).status).toBe(401);
     expect((await request(protectedApp).get("/api/health")).status).toBe(200);
   });
@@ -97,6 +97,19 @@ describe("auth API", () => {
     expect((await request(protectedApp).post("/api/auth/login").set("Origin","https://evil.example").set("Host","localhost").send({username:"nobody",password:"wrong password 123"})).status).toBe(403);
     for(let attempt=0;attempt<5;attempt++) await request(protectedApp).post("/api/auth/password/recover").send({username:"missing-recovery",recoveryCode:"WRONG-CODE",password:"new password 456",passwordConfirmation:"new password 456"});
     expect((await request(protectedApp).post("/api/auth/password/recover").send({username:"missing-recovery",recoveryCode:"WRONG-CODE",password:"new password 456",passwordConfirmation:"new password 456"})).status).toBe(429);
+  });
+
+  it("allows configured GitHub Pages origin and emits cross-site cookie attributes", async () => {
+    const pagesApp=createApp({db,config:{host:"127.0.0.1",allowRemoteBinding:false,port:8787,dataDir:".",databasePath:":memory:",mediaDir:".",backupDir:".",appOrigin:"https://hoatv2211.github.io",auth:{secureCookies:true,cookieSameSite:"none",sessionHours:24,absoluteSessionHours:168},nineRouter:{url:"http://localhost:20128",key:"",chatModel:"",imageModel:"",sttModel:"",ttsModel:"",ttsVoice:""}},nineRouter:{health:async()=>false} as never,protectApi:false});
+    const response=await request(pagesApp).post("/api/auth/register").set("Origin","https://hoatv2211.github.io").set("Host","api.example.com").send({username:"pages-admin",password:"strong password 123",passwordConfirmation:"strong password 123"}).expect(201);
+    expect(response.headers["access-control-allow-origin"]).toBe("https://hoatv2211.github.io");
+    expect(response.headers["access-control-allow-credentials"]).toBe("true");
+    expect(response.headers["set-cookie"][0]).toContain("SameSite=None");
+    expect(response.headers["set-cookie"][0]).toContain("Secure");
+    const preflight=await request(pagesApp).options("/api/auth/login").set("Origin","https://hoatv2211.github.io").set("Access-Control-Request-Headers","content-type").expect(204);
+    expect(preflight.headers["access-control-allow-methods"]).toContain("POST");
+    const logout=await request(pagesApp).post("/api/auth/logout").set("Origin","https://hoatv2211.github.io").set("Host","api.example.com").expect(204);
+    expect(logout.headers["set-cookie"][0]).toContain("SameSite=None");
   });
 
   it("rate-limits registration and username rotation by client address", async () => {

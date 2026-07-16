@@ -11,6 +11,15 @@ afterEach(cleanup);
 beforeEach(()=>{vi.clearAllMocks();vi.mocked(api.learningPaths).mockResolvedValue([{id:1,slug:"a1",title:"A1 Beginner",level:"A1",description:"Start",sortOrder:1,modules:[{id:10,slug:"introduce-yourself",title:"Introduce Yourself",goalVi:"Giới thiệu bản thân",cefr:"A1",sortOrder:1,status:"active",progressPercent:0,mindmapTitle:"People Around Us"},{id:11,slug:"food-and-drinks",title:"Food & Drinks",goalVi:"Gọi món đơn giản",cefr:"A1",sortOrder:2,status:"locked",progressPercent:0,mindmapTitle:"Eating Essentials"}]}] as never);vi.mocked(api.createSession).mockResolvedValue({id:99,durationMinutes:20,status:"active",startedAt:"",completedAt:null,summary:"",items:[]} as never)});
 
 describe("LearningPathPage",()=>{
+  it("uses configured API origin for remote backends",async()=>{
+    vi.stubEnv("VITE_API_BASE_URL","https://api.example.com");
+    const response=new Response(JSON.stringify({ok:true}),{headers:{"content-type":"application/json"}});
+    const fetchMock=vi.spyOn(globalThis,"fetch").mockResolvedValue(response);
+    await api.health();
+    expect(fetchMock).toHaveBeenCalledWith("https://api.example.com/api/health",expect.objectContaining({credentials:"include"}));
+    fetchMock.mockRestore();
+    vi.unstubAllEnvs();
+  });
   it("shows path modules and starts the active module",async()=>{
     render(<AppStoreProvider><LearningPathPage/></AppStoreProvider>);
     expect(await screen.findByText("A1 Beginner")).toBeInTheDocument();

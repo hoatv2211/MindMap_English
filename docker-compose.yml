@@ -12,6 +12,11 @@ services:
       DATA_DIR: /data
       ALLOW_REMOTE_BINDING: "true"
       AUTH_SECURE_COOKIES: "false"
+      AUTH_COOKIE_SAME_SITE: "lax"
+      # Set these when frontend is hosted on GitHub Pages and API runs on this container behind HTTPS.
+      # APP_ORIGIN: "https://hoatv2211.github.io"
+      # AUTH_SECURE_COOKIES: "true"
+      # AUTH_COOKIE_SAME_SITE: "none"
       # Set these when the container can reach your provider API.
       # PROVIDER_API_URL: "http://host.docker.internal:20128"
       # PROVIDER_API_KEY: ""

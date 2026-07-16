@@ -6,7 +6,7 @@ import { migrate } from "../../src/server/db/migrate";
 import { createApp } from "../../src/server/app";
 
 let db:AppDatabase;
-const config={host:"127.0.0.1",allowRemoteBinding:false,port:8787,dataDir:".",databasePath:":memory:",mediaDir:".",backupDir:".",auth:{secureCookies:false,sessionHours:24,absoluteSessionHours:168},nineRouter:{url:"http://localhost:20128",key:"",chatModel:"test-model",imageModel:"",sttModel:"",ttsModel:"",ttsVoice:""}};
+const config={host:"127.0.0.1",allowRemoteBinding:false,port:8787,appOrigin:undefined,dataDir:".",databasePath:":memory:",mediaDir:".",backupDir:".",auth:{secureCookies:false,cookieSameSite:"lax" as const,sessionHours:24,absoluteSessionHours:168},nineRouter:{url:"http://localhost:20128",key:"",chatModel:"test-model",imageModel:"",sttModel:"",ttsModel:"",ttsVoice:""}};
 const draft={normalizedTerm:"negotiate",displayTerm:"negotiate",meaningVi:"dam phan",ipa:"",partOfSpeech:"verb",cefr:"B1",itemType:"word",examples:[{role:"basic",sentence:"We negotiate.",translationVi:"Chung ta dam phan.",usageNote:""},{role:"daily_life",sentence:"Can we negotiate the price?",translationVi:"Co the thuong luong gia khong?",usageNote:""},{role:"personalized",sentence:"I negotiate deadlines.",translationVi:"Toi dam phan thoi han.",usageNote:""}],placement:{mindmapId:null,parentNodeId:null,reason:"new topic",newMindmap:{title:"Negotiation",description:"Useful negotiation language",branchLabel:"Core verbs"}}};
 
 beforeEach(()=>{db=createDatabase(":memory:");migrate(db);db.prepare("INSERT INTO topics(slug,title,title_vi) VALUES ('work','Work','Cong viec')").run()});

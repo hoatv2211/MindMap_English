@@ -7,7 +7,7 @@ import { createApp } from "../../src/server/app";
 
 let db:AppDatabase;
 beforeEach(()=>{db=createDatabase(":memory:");migrate(db)});afterEach(()=>db.close());
-const config={host:"127.0.0.1",allowRemoteBinding:false,port:8787,dataDir:".",databasePath:":memory:",mediaDir:".",backupDir:".",auth:{secureCookies:false,sessionHours:24,absoluteSessionHours:168},nineRouter:{url:"http://localhost:20128",key:"",chatModel:"",imageModel:"",sttModel:"",ttsModel:"",ttsVoice:""}};
+const config={host:"127.0.0.1",allowRemoteBinding:false,port:8787,appOrigin:undefined,dataDir:".",databasePath:":memory:",mediaDir:".",backupDir:".",auth:{secureCookies:false,cookieSameSite:"lax" as const,sessionHours:24,absoluteSessionHours:168},nineRouter:{url:"http://localhost:20128",key:"",chatModel:"",imageModel:"",sttModel:"",ttsModel:"",ttsVoice:""}};
 
 describe("agent thread API",()=>{
   it("creates, sends, persists, and reopens a skill-backed conversation",async()=>{

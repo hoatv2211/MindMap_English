@@ -40,6 +40,17 @@ describe("loadProjectEnv", () => {
     expect(preferred.nineRouter.url).toBe("http://provider.test:20128");
     expect(preferred.nineRouter.chatModel).toBe("provider/chat");
   });
+  it("normalizes GitHub Pages app origin and cookie mode", () => {
+    const config = loadConfig({ APP_ORIGIN: "https://hoatv2211.github.io/MindMap_English/", AUTH_COOKIE_SAME_SITE: "None", AUTH_SECURE_COOKIES: "true" });
+    expect(config.appOrigin).toBe("https://hoatv2211.github.io");
+    expect(config.auth.cookieSameSite).toBe("none");
+    expect(config.auth.secureCookies).toBe(true);
+  });
+  it("treats empty optional URLs as unset", () => {
+    const config = loadConfig({ APP_ORIGIN: "", PROVIDER_API_URL: "" });
+    expect(config.appOrigin).toBeUndefined();
+    expect(config.nineRouter.url).toBe("http://localhost:20128");
+  });
   it("does nothing when .env is missing", () => {
     expect(loadProjectEnv(path.join(os.tmpdir(), "missing-mindmap.env"))).toBe(false);
   });  it("parses explicit boolean security flags", () => {

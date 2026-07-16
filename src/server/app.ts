@@ -21,7 +21,7 @@ import { DocumentRepository } from "./modules/documents/repository";
 import { createDocumentRouter } from "./modules/documents/routes";
 import { AuthService } from "./modules/auth/service";
 import { createAuthRouter } from "./modules/auth/routes";
-import { optionalAuth, requireAuth, requireSameOrigin } from "./modules/auth/middleware";
+import { allowCors, optionalAuth, requireAuth, requireSameOrigin } from "./modules/auth/middleware";
 import { VocabularyInboxRepository } from "./modules/vocabulary-inbox/repository";
 import { VocabularyEnrichmentService } from "./modules/vocabulary-inbox/enrichment-service";
 import { createVocabularyInboxRouter } from "./modules/vocabulary-inbox/routes";
@@ -52,10 +52,11 @@ export function createApp({ db, config = loadConfig(), nineRouter, includeNotFou
 
   app.disable("x-powered-by");
   app.set("trust proxy", "loopback");
+  app.use("/api", allowCors(config.appOrigin));
   app.use(express.json({ limit: "1mb" }));
   app.use(optionalAuth(auth));
-  app.use("/api", requireSameOrigin);
-  app.use("/api/auth", createAuthRouter(auth, config.auth.secureCookies, config.auth.absoluteSessionHours));
+  app.use("/api", requireSameOrigin(config.appOrigin));
+  app.use("/api/auth", createAuthRouter(auth, config.auth.secureCookies, config.auth.absoluteSessionHours, config.auth.cookieSameSite ?? "lax"));
   app.get("/api/health", async (_request, response) => response.json({ ok: true, aiOnline: await client.health(), ...agent.getTutorStatus() }));
   if (protectApi) app.use("/api", requireAuth);
   app.use("/api", createLibraryRouter(content));

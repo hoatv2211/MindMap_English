@@ -7,9 +7,12 @@ export const AUTH_UNAUTHORIZED_EVENT = "mindmap-english:unauthorized";
 export class ApiError extends Error {
   constructor(message: string, readonly status: number, readonly code?: string) { super(message); }
 }
+const getApiBaseUrl = () => (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+const toApiUrl = (path: string, apiBaseUrl = getApiBaseUrl()) => apiBaseUrl ? `${apiBaseUrl}${path}` : path;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, { credentials: "same-origin", ...init, headers: { ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...init?.headers } });
+  const apiBaseUrl = getApiBaseUrl();
+  const response = await fetch(toApiUrl(path, apiBaseUrl), { credentials: apiBaseUrl ? "include" : "same-origin", ...init, headers: { ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...init?.headers } });
   if (!response.ok) {
     if (response.status === 401 && path !== "/api/auth/me" && typeof window !== "undefined") window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
     const body = await response.json().catch(() => ({ error: response.statusText }));
