@@ -182,6 +182,7 @@ data/
 - [Hướng dẫn sử dụng](docs/vi/huong-dan-su-dung.md)
 - [Kiến trúc và phát triển](docs/vi/kien-truc-va-phat-trien.md)
 - [Tích hợp Provider API](docs/vi/tich-hop-9router.md)
+- [Deploy GitHub Pages + VPS Docker](docs/vi/vps-github-pages-deploy.md)
 - [Design specification](docs/superpowers/specs/2026-07-13-mindmap-english-local-ai-design.md)
 - [Implementation plan](docs/superpowers/plans/2026-07-13-mindmap-english-local-ai-implementation.md)
 
