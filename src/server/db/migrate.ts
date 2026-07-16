@@ -340,6 +340,7 @@ CREATE TABLE IF NOT EXISTS users (
   normalized_username TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   status TEXT NOT NULL CHECK(status IN ('active','disabled')) DEFAULT 'active',
+  role TEXT NOT NULL CHECK(role IN ('admin','learner')) DEFAULT 'learner',
   profile_revision INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -512,6 +513,8 @@ export function migrate(db: AppDatabase): void {
   ensureColumn(db, "document_highlights", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
   ensureColumn(db, "generation_jobs", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
   ensureColumn(db, "backups", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");  ensureColumn(db, "agent_threads", "user_id", "INTEGER REFERENCES users(id) ON DELETE CASCADE");
+  ensureColumn(db, "users", "role", "TEXT NOT NULL CHECK(role IN ('admin','learner')) DEFAULT 'learner'");
+  db.prepare("UPDATE users SET role='admin' WHERE id=1 AND role='learner'").run();
   ensureColumn(db, "agent_threads", "archived_at", "TEXT");
   ensureColumn(db, "agent_messages", "status", "TEXT NOT NULL DEFAULT 'completed'");
   ensureColumn(db, "agent_messages", "model", "TEXT NOT NULL DEFAULT ''");

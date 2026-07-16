@@ -3,6 +3,7 @@ import type { AppDatabase } from "../../db/database";
 type ModuleStatus="locked"|"active"|"completed";
 interface PathRow {id:number;slug:string;title:string;level:"A1"|"A2"|"B1"|"B2";description:string;sortOrder:number}
 interface ModuleRow {id:number;pathId:number;slug:string;title:string;goalVi:string;cefr:"A1"|"A2"|"B1"|"B2";topicSlug:string;sortOrder:number;mindmapId:number|null;mindmapTitle:string|null;totalWords:number;stableWords:number;learningWords:number;progressStatus?:ModuleStatus;completedItems?:number;totalItems?:number}
+interface ModuleView {id:number;slug:string;title:string;goalVi:string;cefr:"A1"|"A2"|"B1"|"B2";sortOrder:number;status:ModuleStatus;progressPercent:number;mindmapTitle:string|null;totalWords:number;stableWords:number;learningWords:number}
 
 export class LearningPathRepository{
   constructor(private readonly db:AppDatabase){}
@@ -12,14 +13,14 @@ export class LearningPathRepository{
     const modules=this.moduleRows(userId);
     return paths.map(path=>({
       ...path,
-      modules:modules.filter(module=>module.pathId===path.id).map((module,index)=>this.toModule(module,index)),
+      modules:this.unlockModules(modules.filter(module=>module.pathId===path.id).map((module,index)=>this.toModule(module,index))),
     }));
   }
 
   getModule(id:number,userId?:number){
     const row=this.moduleRows(userId,"m.id=?",[id])[0];
     if(!row)return null;
-    return{...this.toModule(row,row.sortOrder-1),pathId:row.pathId,topicSlug:row.topicSlug,mindmap:row.mindmapId?{id:row.mindmapId,title:row.mindmapTitle}:null};
+    return{...this.toModule(row,row.sortOrder-1),level:row.cefr,pathId:row.pathId,topicSlug:row.topicSlug,mindmap:row.mindmapId?{id:row.mindmapId,title:row.mindmapTitle}:null};
   }
 
   vocabularyIdsForModule(moduleId:number,userId?:number){
@@ -52,5 +53,13 @@ export class LearningPathRepository{
     const progressPercent=Math.min(100,Math.round((completed/total)*100));
     const status:ModuleStatus=module.progressStatus??(index===0?"active":progressPercent>=80?"completed":"locked");
     return{id:module.id,slug:module.slug,title:module.title,goalVi:module.goalVi,cefr:module.cefr,sortOrder:module.sortOrder,status,progressPercent,mindmapTitle:module.mindmapTitle,totalWords:module.totalWords,stableWords:module.stableWords,learningWords:module.learningWords};
+  }
+
+  private unlockModules(modules:ModuleView[]){
+    return modules.map((module,index)=>{
+      if(module.status!=="locked"||index===0)return module;
+      const previous=modules[index-1];
+      return previous?.status==="completed"?{...module,status:"active" as const}:module;
+    });
   }
 }

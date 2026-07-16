@@ -10,7 +10,7 @@ React/Vite UI
 Express local API
     ├── content
     ├── learning + SRS
-    ├── agent + 9Router
+    ├── agent + provider API
     ├── speech
     ├── settings
     └── backup
@@ -162,7 +162,7 @@ npm audit --audit-level=moderate
 
 Module mới:
 
-- `server/modules/dictionary`: `WordIndex`, exact lookup, completion, typo suggestion; không phụ thuộc 9Router.
+- `server/modules/dictionary`: `WordIndex`, exact lookup, completion, typo suggestion; không phụ thuộc provider API.
 - `server/modules/speaking`: sentence notebook, session repository, attempt metrics và LCS transcript diff.
 - `server/modules/documents`: TXT/Markdown/EPUB parser, checksum storage, section/highlight repository và extraction drafts.
 
@@ -187,7 +187,7 @@ SQLite mới vẫn nằm trong snapshot backup. Thư mục `data/documents` là 
 Điểm mở rộng an toàn:
 
 - Thêm thuật toán SRS mới sau interface hiện tại.
-- Thêm provider qua `NineRouterClient` hoặc adapter khác.
+- Thêm provider qua client OpenAI-compatible hoặc adapter khác.
 - Thêm loại quiz bằng `activityType`.
 - Thêm topic seed mà không đổi schema.
 - Thêm PWA service worker sau khi có chiến lược cache API rõ ràng.

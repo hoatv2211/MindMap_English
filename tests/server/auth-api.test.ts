@@ -37,6 +37,15 @@ describe("auth API", () => {
     expect(stored.passwordHash).not.toContain("correct horse");
   });
 
+  it("assigns admin role to the first account and learner role by default", async () => {
+    const first = await request(app()).post("/api/auth/register").send({ username: "first-admin", password: "strong password 123", passwordConfirmation: "strong password 123" }).expect(201);
+    const second = await request(app()).post("/api/auth/register").send({ username: "second-learner", password: "strong password 123", passwordConfirmation: "strong password 123" }).expect(201);
+    expect(first.body.user).toMatchObject({ username: "first-admin", role: "admin", isAdmin: true });
+    expect(second.body.user).toMatchObject({ username: "second-learner", role: "learner", isAdmin: false });
+    expect((db.prepare("SELECT role FROM users WHERE id=1").get() as {role:string}).role).toBe("admin");
+    expect((db.prepare("SELECT role FROM users WHERE id=2").get() as {role:string}).role).toBe("learner");
+  });
+
   it("logs out and logs back in case-insensitively", async () => {
     const agent = request.agent(app());
     await agent.post("/api/auth/register").send({ username: "Learner", password: "strong password 123", passwordConfirmation: "strong password 123" });
